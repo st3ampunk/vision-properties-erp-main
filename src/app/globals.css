@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   Vision Properties — design system
+   Dark theme: pure black. Light theme: white. Blue as the accent family.
+   ============================================================================ */
+
+@layer base {
+  :root {
+    /* Light theme (default) */
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f6f7f9;
+    --surface-3: #eef0f4;
+    --elevated: #ffffff;
+    --border: #e6e8ec;
+    --border-strong: #d4d7dd;
+    --text: #0a0b0d;
+    --text-2: #353a42;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-contrast: #ffffff;
+    --accent-soft: rgba(37, 99, 235, 0.1);
+    --ring: rgba(37, 99, 235, 0.35);
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+    --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.08);
+    --shadow-lg: 0 12px 40px rgba(16, 24, 40, 0.12);
+    color-scheme: light;
+  }
+
+  .dark {
+    /* Dark theme — pure black */
+    --background: #000000;
+    --surface: #09090b;
+    --surface-2: #131316;
+    --surface-3: #1c1c20;
+    --elevated: #0e0e11;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #f5f6f8;
+    --text-2: #cdd1d9;
+    --muted: #888d98;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-contrast: #ffffff;
+    --accent-soft: rgba(59, 130, 246, 0.16);
+    --ring: rgba(59, 130, 246, 0.5);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    background: var(--background);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      Inter, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Surfaces -------------------------------------------------------------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    transition: background-color 0.2s ease, border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  .card-hover {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease,
+      transform 0.12s ease;
+  }
+  .card-hover:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Forms ----------------------------------------------------------------- */
+  .label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .input,
+  .select,
+  .textarea {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease,
+      background-color 0.2s ease;
+  }
+  .input::placeholder,
+  .textarea::placeholder {
+    color: var(--muted);
+    opacity: 0.7;
+  }
+  .input:focus,
+  .select:focus,
+  .textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+    background: var(--surface);
+  }
+  .select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888d98' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 34px;
+  }
+
+  /* Buttons --------------------------------------------------------------- */
+  .btn,
+  .btn-primary,
+  .btn-ghost,
+  .btn-danger,
+  .btn-success {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+      box-shadow 0.15s ease, opacity 0.15s ease, transform 0.05s ease;
+    white-space: nowrap;
+  }
+  .btn:active,
+  .btn-primary:active,
+  .btn-ghost:active,
+  .btn-danger:active,
+  .btn-success:active {
+    transform: translateY(0.5px);
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-primary:hover {
+    background: var(--accent-hover);
+  }
+  .btn-ghost {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+  }
+  .btn-danger {
+    background: #dc2626;
+    color: #fff;
+  }
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+  .btn-success {
+    background: #059669;
+    color: #fff;
+  }
+  .btn-success:hover {
+    background: #047857;
+  }
+  button:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Tables ---------------------------------------------------------------- */
+  .th {
+    padding: 11px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    background: var(--surface-2);
+  }
+  .td {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--text-2);
+  }
+  tbody tr {
+    transition: background-color 0.12s ease;
+  }
+  tbody tr:hover {
+    background: var(--surface-2);
+  }
+}

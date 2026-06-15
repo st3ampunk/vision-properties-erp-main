@@ -1,0 +1,327 @@
+-- ============================================================================
+-- Vision Properties — Plot Booking & Inventory Management Platform
+-- v0.1 MVP — PostgreSQL / Supabase schema
+--
+-- Run this in the Supabase SQL Editor (or `supabase db push`) to create the
+-- schema. Then run `npm run db:seed` to load demo roles, users and inventory.
+-- ============================================================================
+
+-- Extensions ----------------------------------------------------------------
+create extension if not exists "pgcrypto";   -- gen_random_uuid()
+
+-- ---------------------------------------------------------------------------
+-- ENUM TYPES
+-- ---------------------------------------------------------------------------
+do $$ begin
+  create type user_role as enum (
+    'admin',
+    'senior_director',
+    'director',
+    'business_manager',
+    'business_partner',
+    'finance',
+    'legal'
+  );
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type approval_type as enum ('dtcp_rera', 'dtcp_only');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type project_type as enum ('affordable', 'luxury');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type project_status as enum ('draft', 'active', 'on_hold', 'closed');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  -- Plot lifecycle aligned with the v0.1 board: available -> blocked -> booked -> registered/sold
+  create type plot_status as enum (
+    'available',
+    'blocked',
+    'booked',
+    'registered',
+    'sold',
+    'cancelled'
+  );
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type book_mode as enum ('blocking', 'booking');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type booking_status as enum ('pending', 'confirmed', 'cancelled');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type payment_status as enum ('pending', 'completed');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type payment_kind as enum ('blocking', 'advance', 'installment', 'final');
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type loan_token_by as enum ('customer', 'director');
+exception when duplicate_object then null; end $$;
+
+-- ---------------------------------------------------------------------------
+-- USERS & HIERARCHY  (Admin / Sales tiers / Finance / Legal)
+-- ---------------------------------------------------------------------------
+create table if not exists users (
+  id            uuid primary key default gen_random_uuid(),
+  full_name     text        not null,
+  email         text        not null unique,
+  password_hash text        not null,
+  mobile        text,
+  role          user_role   not null,
+  manager_id    uuid        references users(id) on delete set null,
+  is_active     boolean     not null default true,
+  created_at    timestamptz not null default now()
+);
+create index if not exists idx_users_role       on users(role);
+create index if not exists idx_users_manager     on users(manager_id);
+
+-- ---------------------------------------------------------------------------
+-- PROJECT CATEGORIES  (board: "group of same projects will be categorised")
+-- ---------------------------------------------------------------------------
+create table if not exists project_categories (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null unique,
+  description text,
+  created_at  timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- PROJECTS  (board: project creation form, 8 fields + reservation config)
+-- ---------------------------------------------------------------------------
+create table if not exists projects (
+  id             uuid primary key default gen_random_uuid(),
+  name           text          not null,                       -- 1. Project Name*
+  district       text          not null,                       -- 2. District*
+  city           text          not null,                       -- 3. City*
+  remarks        text,                                         -- 4. Remarks
+  area           text          not null,                       -- 5. Area*
+  land_type      text          not null,                       -- 6. Land Type*
+  approval_type  approval_type not null,                       -- 7. Approval Type*
+  project_type   project_type  not null,                       -- 8. Project Type* (affordable/luxury)
+  category_id    uuid          references project_categories(id) on delete set null,
+  status         project_status not null default 'draft',
+  -- Reservation / booking configuration (editable per project, per the board) ----
+  blocking_amount        numeric(14,2) not null default 10000, -- §1 initial block amount (e.g. 10k)
+  blocking_window_hours  integer       not null default 48,    -- §1 block -> must book within N hours
+  advance_percent        numeric(5,2)  not null default 5,     -- §2 booking advance = N% of plot value
+  advance_min_amount     numeric(14,2) not null default 50000, -- §2 advance floor: max(N%, this)
+  booking_window_days    integer       not null default 15,    -- booking -> full payment / else back to company
+  -- §3 Cancellation & refund ------------------------------------------------------
+  cancel_full_refund_days integer      not null default 3,     -- 100% refund if cancelled within N days
+  cancellation_charge    numeric(14,2) not null default 5000,  -- admin charge per plot after that window
+  refund_processing_days integer       not null default 5,     -- payout SLA (working days) after approval
+  -- §7 Plot transfer / change ------------------------------------------------------
+  transfer_charge        numeric(14,2) not null default 5000,  -- downgrade/transfer charge per plot
+  created_by     uuid          references users(id) on delete set null,
+  created_at     timestamptz   not null default now()
+);
+create index if not exists idx_projects_category on projects(category_id);
+create index if not exists idx_projects_status   on projects(status);
+
+-- ---------------------------------------------------------------------------
+-- PLOT CATEGORIES  (plot groups within a project — e.g. Phase 1, Premium)
+-- ---------------------------------------------------------------------------
+create table if not exists plot_categories (
+  id          uuid primary key default gen_random_uuid(),
+  project_id  uuid not null references projects(id) on delete cascade,
+  name        text not null,
+  description text,
+  created_at  timestamptz not null default now(),
+  unique (project_id, name)
+);
+create index if not exists idx_plot_categories_project on plot_categories(project_id);
+
+-- ---------------------------------------------------------------------------
+-- PLOTS  (board: plot creation form)
+-- ---------------------------------------------------------------------------
+create table if not exists plots (
+  id             uuid        primary key default gen_random_uuid(),
+  project_id     uuid        not null references projects(id) on delete cascade,
+  plot_category_id uuid      references plot_categories(id) on delete set null, -- group within the project
+  block          text        not null,                          -- 2. block
+  plot_no        text        not null,                          -- 3. plot no
+  sqft           numeric(12,2) not null,                        -- 4. plot sq.ft
+  price_per_sqft numeric(12,2) not null default 0,              -- drives total plot value / 5% advance
+  description    text,                                           -- 5. desc
+  status         plot_status not null default 'available',       -- 6. current status
+  created_at     timestamptz not null default now(),
+  unique (project_id, block, plot_no)
+);
+create index if not exists idx_plots_project  on plots(project_id);
+create index if not exists idx_plots_category on plots(plot_category_id);
+create index if not exists idx_plots_status   on plots(status);
+
+-- ---------------------------------------------------------------------------
+-- CUSTOMERS  (board: Customer Details section of the booking form)
+-- ---------------------------------------------------------------------------
+create table if not exists customers (
+  id                 uuid primary key default gen_random_uuid(),
+  name               text not null,                  -- 1. Customer Name*
+  mobile             text not null,                  -- 2. Customer Mobile*
+  email              text,                           -- 3. Email
+  dob                date,                           -- 4. D.O.B
+  anniversary_date   date,                           -- (deprecated, kept for legacy data)
+  street             text,                           -- 5. Street
+  area               text,                           -- 6. Area
+  pincode            text,                           -- 7. Pincode (auto-fills state/district/country)
+  state              text,                           -- 8. State
+  district           text,                           -- 9. District
+  country            text,                           -- 10. Country
+  occupation         text,                           -- 11. Occupation
+  occupation_remarks text,                           -- 12. Occupation Remarks
+  created_by         uuid references users(id) on delete set null,
+  created_at         timestamptz not null default now()
+);
+create index if not exists idx_customers_mobile on customers(mobile);
+
+-- ---------------------------------------------------------------------------
+-- BOOKINGS  (board: the full blocking / booking record)
+-- ---------------------------------------------------------------------------
+create table if not exists bookings (
+  id                       uuid primary key default gen_random_uuid(),
+  plot_id                  uuid not null references plots(id) on delete restrict,
+  customer_id              uuid not null references customers(id) on delete restrict,
+  project_id               uuid not null references projects(id) on delete restrict,
+  -- snapshots (board: Project Details section) -----------------------------------
+  block                    text,
+  plot_sqft                numeric(12,2),
+  total_plot_value         numeric(16,2) not null default 0,
+  -- Nominee Details --------------------------------------------------------------
+  nominee_name             text,
+  nominee_mobile           text,
+  nominee_relationship     text,
+  -- Partner Details --------------------------------------------------------------
+  partner_id               uuid references users(id) on delete set null,
+  partner_name             text,
+  director_id              uuid references users(id) on delete set null,
+  director_name            text,
+  -- Payment Details --------------------------------------------------------------
+  tentative_registration_date date,
+  mode_of_payment          text,
+  loan_token_by            loan_token_by,
+  booked_date              date,
+  remarks                  text,
+  book_mode                book_mode      not null,            -- blocking | booking
+  -- amounts & windows ------------------------------------------------------------
+  blocking_amount          numeric(14,2) not null default 0,
+  advance_required         numeric(16,2) not null default 0,   -- §2 max(advance_percent%, advance_min_amount)
+  advance_paid             numeric(16,2) not null default 0,
+  status                   booking_status not null default 'pending',
+  payment_status           payment_status not null default 'pending',
+  expires_at               timestamptz,                        -- block/booking window deadline
+  released_at              timestamptz,                        -- when reverted to company
+  -- §3 Cancellation & refund -----------------------------------------------------
+  cancellation_reason      text,
+  cancellation_charge      numeric(14,2),
+  refund_amount            numeric(16,2),
+  refund_status            text not null default 'none',       -- none | pending_approval | approved | paid
+  refund_approved_by       uuid references users(id) on delete set null,
+  refund_approved_at       timestamptz,
+  refund_due_date          date,
+  refund_paid_at           timestamptz,
+  created_by               uuid references users(id) on delete set null,
+  created_at               timestamptz not null default now()
+);
+create index if not exists idx_bookings_plot     on bookings(plot_id);
+create index if not exists idx_bookings_customer on bookings(customer_id);
+create index if not exists idx_bookings_status   on bookings(status);
+create index if not exists idx_bookings_creator  on bookings(created_by);
+
+-- Only one ACTIVE (pending/confirmed) booking per plot at a time — prevents
+-- double-booking at the database level.
+create unique index if not exists uniq_active_booking_per_plot
+  on bookings(plot_id)
+  where status in ('pending', 'confirmed');
+
+-- ---------------------------------------------------------------------------
+-- PAYMENTS  (board: plot payment, advance / blocking / installments)
+-- ---------------------------------------------------------------------------
+create table if not exists payments (
+  id          uuid primary key default gen_random_uuid(),
+  booking_id  uuid not null references bookings(id) on delete cascade,
+  amount      numeric(16,2) not null,
+  kind        payment_kind  not null,
+  mode        text,
+  status      payment_status not null default 'completed',
+  paid_at     timestamptz   not null default now(),
+  recorded_by uuid references users(id) on delete set null,
+  created_at  timestamptz   not null default now()
+);
+create index if not exists idx_payments_booking on payments(booking_id);
+
+-- ---------------------------------------------------------------------------
+-- REGISTRATIONS  (board: Registration Details / plot registering)
+-- ---------------------------------------------------------------------------
+create table if not exists registrations (
+  id                 uuid primary key default gen_random_uuid(),
+  booking_id         uuid references bookings(id) on delete set null,
+  plot_id            uuid not null references plots(id) on delete restrict,
+  project_id         uuid not null references projects(id) on delete restrict,
+  block              text,                       -- 2. Block*
+  plot_sqft          numeric(12,2),              -- 3. Plot No. - Sq.ft*
+  register_date      date not null,              -- 4. Register Date*
+  register_number    text not null,              -- 5. Register Number*
+  name_of_registrant text not null,              -- 6. Name of Registrant*
+  mobile             text,                       -- 7. Mobile*
+  remarks            text,                       -- 8. Remarks*
+  created_by         uuid references users(id) on delete set null,
+  created_at         timestamptz not null default now()
+);
+create index if not exists idx_registrations_plot on registrations(plot_id);
+
+-- ---------------------------------------------------------------------------
+-- PLOT TRANSFERS  (SOP §7: plot change / upgrade / downgrade)
+-- ---------------------------------------------------------------------------
+create table if not exists plot_transfers (
+  id            uuid primary key default gen_random_uuid(),
+  booking_id    uuid not null references bookings(id) on delete cascade,
+  from_plot_id  uuid not null references plots(id) on delete restrict,
+  to_plot_id    uuid not null references plots(id) on delete restrict,
+  from_value    numeric(16,2) not null default 0,
+  to_value      numeric(16,2) not null default 0,
+  kind          text not null,                 -- upgrade | lateral | downgrade
+  charge        numeric(14,2) not null default 0,
+  remarks       text,
+  approved_by   uuid references users(id) on delete set null,
+  created_by    uuid references users(id) on delete set null,
+  created_at    timestamptz not null default now()
+);
+create index if not exists idx_transfers_booking on plot_transfers(booking_id);
+
+-- ---------------------------------------------------------------------------
+-- NOTIFICATIONS  (board: SMS "Booking Confirmed..." + Voice — logged here)
+-- ---------------------------------------------------------------------------
+create table if not exists notifications (
+  id          uuid primary key default gen_random_uuid(),
+  booking_id  uuid references bookings(id) on delete cascade,
+  channel     text not null,        -- sms | voice | panel
+  recipient   text,
+  message     text not null,
+  created_at  timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- AUDIT LOG  (who did what — every state/money change)
+-- ---------------------------------------------------------------------------
+create table if not exists audit_log (
+  id          uuid primary key default gen_random_uuid(),
+  actor_id    uuid references users(id) on delete set null,
+  actor_name  text,
+  entity      text not null,        -- plot | booking | project | payment | registration | user
+  entity_id   uuid,
+  action      text not null,        -- e.g. block / book / confirm / cancel / register / create
+  details     text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_audit_entity on audit_log(entity, entity_id);
+create index if not exists idx_audit_created on audit_log(created_at desc);
