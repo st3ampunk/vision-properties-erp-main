@@ -477,3 +477,22 @@ create index if not exists idx_service_requests_stage       on service_requests(
 create index if not exists idx_service_requests_requested_by on service_requests(requested_by);
 create index if not exists idx_service_requests_customer    on service_requests(customer_id);
 create index if not exists idx_service_requests_booking     on service_requests(booking_id);
+
+-- ---------------------------------------------------------------------------
+-- COUPONS / TOKENS  (see migration 0011) — coupons/tokens issued to a
+-- salesperson. Admin can issue extra (e.g. a Cab Token to a Director).
+-- Balance per type = sum of the person's rows.
+-- ---------------------------------------------------------------------------
+create table if not exists coupons (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  type        text not null,                  -- cab | tools | digital | gold
+  quantity    integer not null default 0,
+  value       numeric(14,2) not null default 0,
+  source      text not null default 'admin',  -- admin | auto
+  note        text,
+  issued_by   uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_coupons_user on coupons(user_id);
+create index if not exists idx_coupons_type on coupons(type);

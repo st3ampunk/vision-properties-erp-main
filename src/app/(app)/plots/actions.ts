@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import { requireCapability } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -42,6 +43,7 @@ export async function releasePlot(formData: FormData): Promise<void> {
   await logAudit(actor, "plot", plot_id, "release");
   revalidatePath(`/plots/${plot_id}`);
   revalidatePath("/plots");
+  revalidatePath("/inventory/release");
   revalidatePath("/dashboard");
 }
 
@@ -111,4 +113,50 @@ export async function updatePlotPrice(formData: FormData): Promise<void> {
   await getSupabase().from("plots").update({ price_per_sqft }).eq("id", id);
   await logAudit(actor, "plot", id, "price_update", String(price_per_sqft));
   revalidatePath(`/plots/${id}`);
+}
+
+// Full edit of a plot's details (no/plot no, sq.ft, price, category, description).
+// Existing bookings snapshot their own value, so editing the plot is safe.
+export async function updatePlot(formData: FormData): Promise<void> {
+  const actor = await requireCapability("manage_plots");
+  const id = String(formData.get("id") || "");
+  const project_id = String(formData.get("project_id") || "");
+  const plot_no = String(formData.get("plot_no") || "").trim();
+  const sqft = Number(formData.get("sqft") || 0);
+  const price_per_sqft = Number(formData.get("price_per_sqft") || 0);
+  const plot_category_id = String(formData.get("plot_category_id") || "") || null;
+  const description = String(formData.get("description") || "").trim() || null;
+  if (!id || !plot_no || sqft <= 0) return;
+
+  await getSupabase()
+    .from("plots")
+    .update({ plot_no, sqft, price_per_sqft, plot_category_id, description })
+    .eq("id", id);
+  await logAudit(actor, "plot", id, "update", plot_no);
+  if (project_id) revalidatePath(`/inventory/manage/${project_id}`);
+  revalidatePath("/plots");
+}
+
+// Delete a plot. Blocked if it has any bookings/registrations (FK is RESTRICT) —
+// release/cancel those first.
+export async function deletePlot(formData: FormData): Promise<void> {
+  const actor = await requireCapability("manage_plots");
+  const id = String(formData.get("id") || "");
+  const project_id = String(formData.get("project_id") || "");
+  if (!id) return;
+  const sb = getSupabase();
+
+  const [{ count: bookings }, { count: registrations }] = await Promise.all([
+    sb.from("bookings").select("id", { count: "exact", head: true }).eq("plot_id", id),
+    sb.from("registrations").select("id", { count: "exact", head: true }).eq("plot_id", id),
+  ]);
+  if ((bookings ?? 0) > 0 || (registrations ?? 0) > 0) {
+    if (project_id) redirect(`/inventory/manage/${project_id}?error=plot_has_dependents`);
+    return;
+  }
+
+  await sb.from("plots").delete().eq("id", id);
+  await logAudit(actor, "plot", id, "delete", id);
+  if (project_id) revalidatePath(`/inventory/manage/${project_id}`);
+  revalidatePath("/plots");
 }

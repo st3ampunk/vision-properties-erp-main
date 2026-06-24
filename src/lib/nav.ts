@@ -7,7 +7,17 @@ export interface NavItem {
   icon: IconName;
   roles: Role[];
   // optional grouping for section headers in the sidebar
-  group: "Overview" | "Inventory" | "Sales" | "Operations" | "Reports" | "Administration";
+  group:
+    | "Overview"
+    | "Inventory"
+    | "Pre-Sales"
+    | "Post-Sales"
+    | "Clients"
+    | "Sales"
+    | "Business Partners"
+    | "Operations"
+    | "Reports"
+    | "Administration";
 }
 
 const ALL: Role[] = [
@@ -29,6 +39,9 @@ const SALES: Role[] = [
 // Everyone EXCEPT admin. Admin gets its own card-based Inventory pages (Add
 // Project / Add Plots / Manage) instead of the shared read-only tables.
 const ALL_NON_ADMIN: Role[] = ALL.filter((r) => r !== "admin");
+// Sales tiers excluding admin — admin's blocking/booking/payment actions are
+// surfaced as the dedicated Pre-Sales / Post-Sales items below instead.
+const SALES_NON_ADMIN: Role[] = SALES.filter((r) => r !== "admin");
 
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard", roles: ALL, group: "Overview" },
@@ -39,15 +52,29 @@ export const NAV: NavItem[] = [
   { href: "/inventory/add-project", label: "Add Project", icon: "building", roles: ["admin"], group: "Inventory" },
   { href: "/inventory/add-plots", label: "Add Plots", icon: "cube", roles: ["admin"], group: "Inventory" },
   { href: "/inventory/manage", label: "Manage/Edit Plots", icon: "layers", roles: ["admin"], group: "Inventory" },
-  { href: "/customers", label: "Customers", icon: "userCircle", roles: SALES, group: "Sales" },
-  { href: "/bookings", label: "Bookings & Blocking", icon: "fileText", roles: [...SALES, "finance"], group: "Sales" },
+  { href: "/customers", label: "Customers", icon: "userCircle", roles: SALES, group: "Clients" },
+  // Shared bookings list — non-admin sales + finance. Admin uses the Pre/Post-Sales
+  // labelled actions below (which deep-link into this same engine via query params).
+  { href: "/bookings", label: "Bookings & Blocking", icon: "fileText", roles: [...SALES_NON_ADMIN, "finance"], group: "Sales" },
   { href: "/requests", label: "Requests", icon: "clock", roles: ["senior_director", "director", "business_manager", "business_partner", "finance", "legal"], group: "Sales" },
+  // --- Admin Pre-Sales actions (no duplicate logic — query-param entry points) ---
+  { href: "/bookings/add", label: "Add Blocking & Booking", icon: "plus", roles: ["admin"], group: "Pre-Sales" },
+  { href: "/bookings", label: "Blockings & Bookings", icon: "fileText", roles: ["admin"], group: "Pre-Sales" },
+  // --- Admin Post-Sales actions ---
+  // Part Payment + Fully Paid Receipt + Cancellation share one tabbed page.
+  { href: "/post-sales", label: "Payments & Cancellation", icon: "creditCard", roles: ["admin"], group: "Post-Sales" },
+  { href: "/inventory/release", label: "Plot Release", icon: "cube", roles: ["admin"], group: "Post-Sales" },
   { href: "/requests", label: "Approvals", icon: "clock", roles: ["admin"], group: "Operations" },
-  { href: "/payments", label: "Payments", icon: "creditCard", roles: ["admin", "finance"], group: "Operations" },
+  // Payments list — finance only (admin reaches it via Part Payment / Fully Paid Receipt).
+  { href: "/payments", label: "Payments", icon: "creditCard", roles: ["finance"], group: "Operations" },
   { href: "/registrations", label: "Registrations", icon: "scroll", roles: ["admin", "legal"], group: "Operations" },
-  { href: "/business-operators", label: "Business Operators", icon: "briefcase", roles: ["admin", "senior_director", "director", "business_manager"], group: "Sales" },
+  { href: "/business-operators", label: "Business Operators", icon: "briefcase", roles: ["admin", "senior_director", "director", "business_manager"], group: "Business Partners" },
   { href: "/reports", label: "Reports", icon: "barChart", roles: ["admin", "senior_director", "director", "business_manager", "finance", "legal"], group: "Reports" },
-  { href: "/users", label: "Users & Hierarchy", icon: "users", roles: ["admin"], group: "Administration" },
+  // --- Admin Partners (all backed by the existing /users page + users/actions) ---
+  { href: "/users?action=new", label: "Add New Partner", icon: "plus", roles: ["admin"], group: "Business Partners" },
+  { href: "/users", label: "View Partner", icon: "users", roles: ["admin"], group: "Business Partners" },
+  { href: "/users?view=block", label: "Block Partner", icon: "trash", roles: ["admin"], group: "Business Partners" },
+  { href: "/users?view=placement", label: "Change Team / Level", icon: "sitemap", roles: ["admin"], group: "Business Partners" },
   { href: "/settings", label: "Settings", icon: "cog", roles: ["admin"], group: "Administration" },
 ];
 

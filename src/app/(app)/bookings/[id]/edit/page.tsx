@@ -42,7 +42,7 @@ export default async function EditBookingPage({
       <PageHeader
         title="Edit Booking Details"
         subtitle={`${b.projects?.name ?? "—"} · Plot ${b.plots?.plot_no ?? "—"} · ${b.customers?.name ?? "—"}`}
-        action={<Link href={`/bookings/${id}`} className="btn-ghost">Cancel</Link>}
+        back={{ href: `/bookings/${id}`, label: "← Back" }}
       />
 
       <form action={updateBooking} className="max-w-3xl space-y-6">

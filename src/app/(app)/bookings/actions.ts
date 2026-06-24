@@ -407,7 +407,9 @@ export async function cancelBooking(formData: FormData): Promise<void> {
       refund_status,
     })
     .eq("id", id);
-  await sb.from("plots").update({ status: "available" }).eq("id", booking.plot_id);
+  // Hold the plot as 'cancelled' (not 'available') so an Admin releases it from
+  // the Plot Release page. To the cancelling user it still reads as released.
+  await sb.from("plots").update({ status: "cancelled" }).eq("id", booking.plot_id);
 
   await logAudit(
     actor,

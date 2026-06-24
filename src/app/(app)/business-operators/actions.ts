@@ -122,3 +122,31 @@ export async function toggleMemberActive(formData: FormData): Promise<void> {
   revalidatePath("/business-operators");
   revalidatePath("/users");
 }
+
+// Issue extra coupons/tokens to a salesperson — ADMIN only (manage_users is
+// admin-exclusive). Records one ledger row; balances are summed for display.
+export async function issueCoupon(formData: FormData): Promise<void> {
+  const actor = await requireCapability("manage_users");
+  const sb = getSupabase();
+
+  const user_id = String(formData.get("user_id") || "");
+  const type = String(formData.get("type") || "").trim();
+  const quantity = Math.max(0, Math.floor(Number(formData.get("quantity") || 0)));
+  const value = Math.max(0, Number(formData.get("value") || 0));
+  const note = String(formData.get("note") || "").trim() || null;
+  if (!user_id || !type || (quantity <= 0 && value <= 0)) return;
+
+  const { error } = await sb.from("coupons").insert({
+    user_id,
+    type,
+    quantity,
+    value,
+    source: "admin",
+    note,
+    issued_by: actor.id,
+  });
+  if (error) return;
+
+  await logAudit(actor, "coupon", user_id, "issue", `${quantity || value} ${type}`);
+  revalidatePath("/business-operators");
+}

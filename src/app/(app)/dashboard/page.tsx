@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import type { SessionUser } from "@/lib/session";
 import { can, isSalesRole, ROLE_LABELS } from "@/lib/roles";
 import { supabaseConfigured } from "@/lib/supabase";
-import { getDashboard, getSalesDashboard, getSeniorOverview } from "@/lib/queries";
+import { getDashboard, getAdminInsights, getSalesDashboard, getSeniorOverview } from "@/lib/queries";
 import { sweepExpiredBookings } from "@/lib/lifecycle";
 import { inr, inrCompact, timeAgo } from "@/lib/format";
 import { EmptyState, BookingStatusBadge, PaymentBadge, Badge } from "@/components/ui";
@@ -70,6 +70,8 @@ export default async function DashboardPage() {
 
   // Admin (and Finance/Legal) see company-wide figures.
   const d = await getDashboard(user.role === "admin" ? undefined : user.id);
+  // Extra company-wide business intelligence — ADMIN dashboard only.
+  const insights = user.role === "admin" ? await getAdminInsights() : null;
 
   const sold = d.breakdown.booked + d.breakdown.registered + d.breakdown.sold;
   const sellThrough = d.plots > 0 ? Math.round((sold / d.plots) * 100) : 0;
@@ -134,6 +136,55 @@ export default async function DashboardPage() {
         />
       </div>
 
+      {/* Business health + needs-attention — ADMIN only */}
+      {insights && (
+        <>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Realized Sales" value={inrCompact(insights.registeredValue)}
+              sub={`${insights.registeredCount} plots registered`}
+              icon={<Scroll size={20} />} accent="#8b5cf6" href="/registrations"
+            />
+            <KpiCard
+              label="Avg Deal Size" value={inrCompact(insights.avgDealSize)}
+              sub={`${insights.totalBookings} total deals`}
+              icon={<Rupee size={20} />} accent="#428fdf"
+            />
+            <KpiCard
+              label="Collection Rate" value={`${insights.collectionRate}%`}
+              sub={`${inrCompact(insights.collected)} of ${inrCompact(insights.bookedValue)}`}
+              icon={<CreditCard size={20} />} accent="#10b981"
+            />
+            <KpiCard
+              label="Cancellation Rate" value={`${insights.cancellationRate}%`}
+              sub={`${insights.cancelledCount} cancelled deals`}
+              icon={<FileText size={20} />} accent="#e4433a"
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              label="Pending Approvals" value={String(insights.requestsPending)}
+              sub="Awaiting a decision" icon={<Clock size={20} />} accent="#428fdf" href="/requests"
+            />
+            <KpiCard
+              label="Refunds Pending" value={inrCompact(insights.refundsPending)}
+              sub={`${insights.refundsPendingCount} to process`}
+              icon={<Rupee size={20} />} accent="#e4433a" href="/post-sales"
+            />
+            <KpiCard
+              label="Plots to Release" value={String(insights.plotsPendingRelease)}
+              sub={`${inrCompact(insights.valueLocked)} locked`}
+              icon={<Grid size={20} />} accent="#f59e0b" href="/inventory/release"
+            />
+            <KpiCard
+              label="New Customers" value={String(insights.newCustomersThisMonth)}
+              sub="This month" icon={<UserCircle size={20} />} accent="#10b981" href="/customers"
+            />
+          </div>
+        </>
+      )}
+
       {/* Sales performance + inventory donut */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel
@@ -184,6 +235,66 @@ export default async function DashboardPage() {
           />
         </Panel>
       </div>
+
+      {/* Top performers + revenue by type — ADMIN only */}
+      {insights && (
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Panel
+            title="Top Performers"
+            accent="#10b981"
+            action={<Link href="/business-operators" className="flex items-center gap-1 text-xs text-[var(--accent)] hover:underline">All <ArrowRight size={13} /></Link>}
+          >
+            {insights.topPerformers.length === 0 ? (
+              <div className="flex h-40 items-center justify-center text-sm text-[var(--muted)]">No bookings yet</div>
+            ) : (
+              <div className="space-y-4">
+                {insights.topPerformers.map((p) => {
+                  const max = Math.max(...insights.topPerformers.map((x) => x.value), 1);
+                  return (
+                    <div key={p.code ?? p.name}>
+                      <div className="mb-1.5 flex items-center justify-between text-sm">
+                        <span className="font-medium">
+                          {p.name}
+                          {p.code && <span className="ml-1.5 font-mono text-xs text-[var(--muted)]">{p.code}</span>}
+                        </span>
+                        <span className="tabular-nums text-[var(--muted)]">{inrCompact(p.value)} · {p.count}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-3)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${(p.value / max) * 100}%`, background: "#10b981" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Revenue by Project Type" accent="#8b5cf6">
+            {insights.revenueByType.length === 0 ? (
+              <div className="flex h-40 items-center justify-center text-sm text-[var(--muted)]">No bookings yet</div>
+            ) : (
+              <div className="space-y-4">
+                {insights.revenueByType.map((t) => {
+                  const max = Math.max(...insights.revenueByType.map((x) => x.value), 1);
+                  const label = t.type === "affordable" ? "Affordable" : t.type === "luxury" ? "Luxury" : t.type;
+                  const color = t.type === "luxury" ? "#8b5cf6" : "#428fdf";
+                  return (
+                    <div key={t.type}>
+                      <div className="mb-1.5 flex items-center justify-between text-sm">
+                        <span className="font-medium">{label}</span>
+                        <span className="tabular-nums text-[var(--muted)]">{inrCompact(t.value)} · {t.count}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-3)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${(t.value / max) * 100}%`, background: color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
 
       {/* Top projects + activity */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">

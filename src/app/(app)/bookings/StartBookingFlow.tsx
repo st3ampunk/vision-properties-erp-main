@@ -55,14 +55,19 @@ export default function StartBookingFlow({
   if (project && selected) {
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setSelected(null)}
+            className="btn-ghost"
+            style={{ padding: "5px 12px", fontSize: 13 }}
+          >
+            ← Back to plots
+          </button>
           <h2 className="text-sm font-semibold">
             {selected.mode === "blocking" ? "New Blocking" : "New Booking"} — {project.name} · Plot{" "}
             {selected.plot.plot_no}
           </h2>
-          <button type="button" onClick={() => setSelected(null)} className="btn-ghost">
-            ← Back to plots
-          </button>
         </div>
         <BookingForm
           mode={selected.mode}
@@ -114,7 +119,15 @@ export default function StartBookingFlow({
 
     return (
       <div className="space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setProjectId(null)}
+            className="btn-ghost"
+            style={{ padding: "5px 12px", fontSize: 13 }}
+          >
+            ← Back to projects
+          </button>
           <div>
             <h2 className="text-lg font-semibold">{project.name}</h2>
             <p className="text-xs text-[var(--muted)]">
@@ -122,9 +135,6 @@ export default function StartBookingFlow({
               Block {inr(project.blocking_amount)} / Book {project.advance_percent}% advance
             </p>
           </div>
-          <button type="button" onClick={() => setProjectId(null)} className="btn-ghost">
-            ← Back to projects
-          </button>
         </div>
 
         {/* search + category filter */}
@@ -207,8 +217,8 @@ export default function StartBookingFlow({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">Select a Project</h2>
+      <div className="space-y-3">
+        <span className="text-sm font-semibold">Select a Project</span>
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="input"

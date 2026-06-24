@@ -39,7 +39,7 @@ export default async function NewRegistrationPage({
       <PageHeader
         title="Register Plot"
         subtitle={`${b.projects.name} · Plot ${b.plots.plot_no}`}
-        action={<Link href={`/bookings/${b.id}`} className="btn-ghost">Cancel</Link>}
+        back={{ href: `/bookings/${b.id}`, label: "← Back" }}
       />
 
       <form action={createRegistration} className="max-w-2xl space-y-6">

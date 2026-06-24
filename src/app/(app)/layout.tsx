@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
 import { navFor } from "@/lib/nav";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -22,7 +23,9 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen">
-      <SideNav items={items} />
+      <Suspense fallback={null}>
+        <SideNav items={items} />
+      </Suspense>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header

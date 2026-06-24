@@ -16,7 +16,7 @@ export default async function NewProjectPage() {
       <PageHeader
         title="New Project"
         subtitle="Set up a new development and configure its booking rules."
-        action={<Link href="/projects" className="btn-ghost">Cancel</Link>}
+        back={{ href: "/projects", label: "← Back" }}
       />
 
       <form action={createProject} className="max-w-3xl space-y-6">

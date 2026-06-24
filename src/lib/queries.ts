@@ -529,3 +529,144 @@ export async function getDashboard(scopeUserId?: string): Promise<DashboardData>
     recentActivity: (activityRes.data ?? []) as ActivityRow[],
   };
 }
+
+// ---------------------------------------------------------------------------
+// ADMIN INSIGHTS — company-wide business intelligence shown ONLY on the admin
+// dashboard (never scoped, never on other panels). Real figures from the DB.
+// ---------------------------------------------------------------------------
+export interface PerformerRow {
+  name: string;
+  code: string | null;
+  count: number;
+  value: number;
+}
+
+export interface AdminInsights {
+  // Realized vs in-flight money
+  registeredValue: number;
+  registeredCount: number;
+  bookedValue: number;
+  collected: number;
+  outstanding: number;
+  avgDealSize: number;
+  collectionRate: number;
+  // Risk / money tied up
+  refundsPending: number;
+  refundsPendingCount: number;
+  valueLocked: number; // value of cancelled plots awaiting release
+  plotsPendingRelease: number;
+  // Health
+  totalBookings: number;
+  cancelledCount: number;
+  cancellationRate: number;
+  conversionRate: number;
+  newCustomersThisMonth: number;
+  requestsPending: number;
+  // Breakdowns
+  topPerformers: PerformerRow[];
+  revenueByType: { type: string; value: number; count: number }[];
+}
+
+export async function getAdminInsights(): Promise<AdminInsights> {
+  const sb = getSupabase();
+  const nowKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
+
+  const [plotsRes, bookingsRes, projectsRes, customersRes, requestsPending] = await Promise.all([
+    sb.from("plots").select("status, sqft, price_per_sqft"),
+    sb
+      .from("bookings")
+      .select("status, book_mode, total_plot_value, advance_paid, partner_name, partner_code, project_id, refund_status, refund_amount"),
+    sb.from("projects").select("id, project_type"),
+    sb.from("customers").select("created_at"),
+    count("service_requests", (q) => q.eq("status", "pending")),
+  ]);
+
+  // Plots → realized value (registered/sold) + value locked in cancelled plots.
+  const plots = (plotsRes.data ?? []) as { status: string; sqft: number; price_per_sqft: number }[];
+  let registeredValue = 0, registeredCount = 0, valueLocked = 0, plotsPendingRelease = 0;
+  for (const p of plots) {
+    const v = Number(p.sqft || 0) * Number(p.price_per_sqft || 0);
+    if (p.status === "registered" || p.status === "sold") {
+      registeredValue += v;
+      registeredCount++;
+    } else if (p.status === "cancelled") {
+      valueLocked += v;
+      plotsPendingRelease++;
+    }
+  }
+
+  const bookings = (bookingsRes.data ?? []) as {
+    status: string;
+    book_mode: string;
+    total_plot_value: number;
+    advance_paid: number;
+    partner_name: string | null;
+    partner_code: string | null;
+    project_id: string;
+    refund_status: string;
+    refund_amount: number | null;
+  }[];
+  const projectType = new Map(
+    ((projectsRes.data ?? []) as { id: string; project_type: string }[]).map((p) => [p.id, p.project_type]),
+  );
+
+  let bookedValue = 0, collected = 0, activeBookings = 0, confirmed = 0, cancelledCount = 0;
+  let refundsPending = 0, refundsPendingCount = 0;
+  const perf = new Map<string, PerformerRow>();
+  const typeAgg = new Map<string, { value: number; count: number }>();
+
+  for (const b of bookings) {
+    if (b.status === "cancelled") {
+      cancelledCount++;
+      if (b.refund_status === "pending_approval" || b.refund_status === "approved") {
+        refundsPending += Number(b.refund_amount || 0);
+        refundsPendingCount++;
+      }
+      continue;
+    }
+    activeBookings++;
+    bookedValue += Number(b.total_plot_value || 0);
+    collected += Number(b.advance_paid || 0);
+    if (b.status === "confirmed") confirmed++;
+
+    const name = b.partner_name ?? "Direct / Admin";
+    const key = b.partner_code ?? name;
+    const a = perf.get(key) ?? { name, code: b.partner_code, count: 0, value: 0 };
+    a.count++;
+    a.value += Number(b.total_plot_value || 0);
+    perf.set(key, a);
+
+    const t = projectType.get(b.project_id) ?? "other";
+    const ta = typeAgg.get(t) ?? { value: 0, count: 0 };
+    ta.value += Number(b.total_plot_value || 0);
+    ta.count++;
+    typeAgg.set(t, ta);
+  }
+
+  const totalBookings = bookings.length;
+  const customers = (customersRes.data ?? []) as { created_at: string }[];
+
+  return {
+    registeredValue,
+    registeredCount,
+    bookedValue,
+    collected,
+    outstanding: Math.max(0, bookedValue - collected),
+    avgDealSize: activeBookings > 0 ? Math.round(bookedValue / activeBookings) : 0,
+    collectionRate: bookedValue > 0 ? Math.round((collected / bookedValue) * 100) : 0,
+    refundsPending,
+    refundsPendingCount,
+    valueLocked,
+    plotsPendingRelease,
+    totalBookings,
+    cancelledCount,
+    cancellationRate: totalBookings > 0 ? Math.round((cancelledCount / totalBookings) * 100) : 0,
+    conversionRate: activeBookings > 0 ? Math.round((confirmed / activeBookings) * 100) : 0,
+    newCustomersThisMonth: customers.filter((c) => keyOf(c.created_at) === nowKey).length,
+    requestsPending,
+    topPerformers: [...perf.values()].sort((a, b) => b.value - a.value).slice(0, 5),
+    revenueByType: [...typeAgg.entries()]
+      .map(([type, a]) => ({ type, value: a.value, count: a.count }))
+      .sort((a, b) => b.value - a.value),
+  };
+}

@@ -23,6 +23,8 @@ export default function BookingsWorkspace({
   canBook = false,
   showSalesperson = false,
   flow,
+  initialCreating = false,
+  hideCreate = false,
 }: {
   rows: BookingRow[];
   canConfirm: boolean;
@@ -32,11 +34,13 @@ export default function BookingsWorkspace({
   canBook?: boolean;
   showSalesperson?: boolean;
   flow: FlowData | null;
+  initialCreating?: boolean;
+  hideCreate?: boolean;
 }) {
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(initialCreating);
 
-  // No create permission → just the list.
-  if (!canCreate || !flow) {
+  // No create permission (or a focused view like Cancellation) → just the list.
+  if (!canCreate || !flow || hideCreate) {
     return (
       <BookingsTable
         rows={rows}

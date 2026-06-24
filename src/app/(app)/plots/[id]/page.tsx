@@ -54,11 +54,7 @@ export default async function PlotDetailPage({
       <PageHeader
         title={`Plot ${plot.plot_no}`}
         subtitle={`${project.name} · ${project.city}`}
-        action={
-          <Link href={`/projects/${project.id}`} className="btn-ghost">
-            ← Project
-          </Link>
-        }
+        back={{ href: `/projects/${project.id}`, label: "← Project" }}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">

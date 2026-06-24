@@ -41,12 +41,8 @@ export default async function CustomerDetailPage({
       <PageHeader
         title={customer.name}
         subtitle={`${customer.mobile}${customer.occupation ? " · " + customer.occupation : ""}`}
-        action={
-          <>
-            <Link href="/customers" className="btn-ghost">← Customers</Link>
-            <Link href={`/customers/${id}/edit`} className="btn-primary">Edit</Link>
-          </>
-        }
+        back={{ href: "/customers", label: "← Customers" }}
+        action={<Link href={`/customers/${id}/edit`} className="btn-primary">Edit</Link>}
       />
 
       {dup && (

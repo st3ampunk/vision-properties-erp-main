@@ -79,20 +79,16 @@ export default async function ProjectDetailPage({
       <PageHeader
         title={p.name}
         subtitle={`${p.city} · ${p.district} · ${p.area}`}
+        back={{ href: "/projects", label: "← All Projects" }}
         action={
-          <>
-            <Link href="/projects" className="btn-ghost">
-              ← All Projects
-            </Link>
-            {editable && (
-              <>
-                <Link href={`/projects/${p.id}/edit`} className="btn-primary">
-                  Edit
-                </Link>
-                <DeleteProjectButton id={p.id} name={p.name} />
-              </>
-            )}
-          </>
+          editable ? (
+            <>
+              <Link href={`/projects/${p.id}/edit`} className="btn-primary">
+                Edit
+              </Link>
+              <DeleteProjectButton id={p.id} name={p.name} />
+            </>
+          ) : undefined
         }
       />
 

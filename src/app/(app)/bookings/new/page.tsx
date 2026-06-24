@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireCapability } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
@@ -43,7 +42,7 @@ export default async function NewBookingPage({
       <PageHeader
         title={mode === "blocking" ? "Block Plot" : "Book Plot"}
         subtitle={`${plot.projects.name} · Plot ${plot.plot_no}`}
-        action={<Link href={`/plots/${plotId}`} className="btn-ghost">Cancel</Link>}
+        back={{ href: `/plots/${plotId}`, label: "← Back" }}
       />
       {sp.err === "underpaid" && (
         <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">

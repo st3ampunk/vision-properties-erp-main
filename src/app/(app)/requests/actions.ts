@@ -175,7 +175,9 @@ export async function advanceServiceRequest(formData: FormData): Promise<void> {
         })
         .eq("id", bk.id);
       if (bk.plot_id) {
-        await sb.from("plots").update({ status: "available" }).eq("id", bk.plot_id);
+        // Hold as 'cancelled' for Admin to release from the Plot Release page —
+        // the requesting panel still sees the cancellation as completed.
+        await sb.from("plots").update({ status: "cancelled" }).eq("id", bk.plot_id);
       }
     }
   }

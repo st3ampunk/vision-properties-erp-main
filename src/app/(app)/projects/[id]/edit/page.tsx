@@ -29,7 +29,7 @@ export default async function EditProjectPage({
       <PageHeader
         title="Edit Project"
         subtitle={p.name}
-        action={<Link href={`/projects/${p.id}`} className="btn-ghost">Cancel</Link>}
+        back={{ href: `/projects/${p.id}`, label: "← Back" }}
       />
 
       <form action={updateProject} className="max-w-3xl space-y-6">

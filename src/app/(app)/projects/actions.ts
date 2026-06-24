@@ -99,9 +99,10 @@ export async function updateProject(formData: FormData): Promise<void> {
   if (error) return;
 
   await logAudit(actor, "project", id, "update", payload.name);
+  revalidatePath(`/inventory/manage/${id}`);
   revalidatePath(`/projects/${id}`);
   revalidatePath("/projects");
-  redirect(`/projects/${id}`);
+  redirect(`/inventory/manage/${id}`);
 }
 
 export async function deleteProject(formData: FormData): Promise<void> {
@@ -118,15 +119,16 @@ export async function deleteProject(formData: FormData): Promise<void> {
   ]);
 
   if ((bookings ?? 0) > 0 || (registrations ?? 0) > 0) {
-    redirect(`/projects/${id}?error=has_dependents`);
+    redirect(`/inventory/manage/${id}?error=has_dependents`);
   }
 
   const { error } = await sb.from("projects").delete().eq("id", id);
-  if (error) redirect(`/projects/${id}?error=delete_failed`);
+  if (error) redirect(`/inventory/manage/${id}?error=delete_failed`);
 
   await logAudit(actor, "project", id, "delete");
   revalidatePath("/projects");
-  redirect("/projects");
+  revalidatePath("/inventory/manage");
+  redirect("/inventory/manage");
 }
 
 export async function updateProjectStatus(formData: FormData): Promise<void> {

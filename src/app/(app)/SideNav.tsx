@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { NavItem } from "@/lib/nav";
 import { Icons } from "@/components/icons";
 
 const GROUP_ORDER: NavItem["group"][] = [
   "Overview",
   "Inventory",
+  "Pre-Sales",
+  "Post-Sales",
+  "Clients",
   "Sales",
+  "Business Partners",
   "Operations",
   "Reports",
   "Administration",
@@ -17,8 +21,34 @@ const GROUP_ORDER: NavItem["group"][] = [
 
 export default function SideNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Highlight the SINGLE best-matching item for the current URL, so query-param
+  // entry points (e.g. /bookings?new=blocking vs /bookings) light up the right
+  // item instead of every sibling that shares the path. Score: path-only match
+  // = 0; a match where ALL of the item's query params are present = 1 + count
+  // (more specific wins); a path or query miss = -1 (not active).
+  const scoreHref = (href: string): number => {
+    const [path, query] = href.split("?");
+    if (pathname !== path && !pathname.startsWith(path + "/")) return -1;
+    if (!query) return 0;
+    const want = new URLSearchParams(query);
+    for (const [k, v] of want) {
+      if (searchParams.get(k) !== v) return -1;
+    }
+    return 1 + [...want].length;
+  };
+  let activeHref = "";
+  let bestScore = -1;
+  for (const item of items) {
+    const sc = scoreHref(item.href);
+    if (sc > bestScore) {
+      bestScore = sc;
+      activeHref = item.href;
+    }
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -90,8 +120,7 @@ export default function SideNav({ items }: { items: NavItem[] }) {
             )}
             <div className="flex flex-col gap-1">
               {group.items.map((item) => {
-                const active =
-                  pathname === item.href || pathname.startsWith(item.href + "/");
+                const active = item.href === activeHref && bestScore >= 0;
                 const Icon = Icons[item.icon];
                 return (
                   <Link

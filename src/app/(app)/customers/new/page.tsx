@@ -14,7 +14,7 @@ export default async function NewCustomerPage() {
       <PageHeader
         title="Add Customer"
         subtitle="Capture the customer's personal, contact and identity details."
-        action={<Link href="/customers" className="btn-ghost">Cancel</Link>}
+        back={{ href: "/customers", label: "← Back" }}
       />
       <form action={createCustomer} className="max-w-3xl space-y-6">
         <div className="card">

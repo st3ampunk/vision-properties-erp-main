@@ -37,11 +37,13 @@ function Tab({
 export default function PaymentsWorkspace({
   ledger,
   deals,
+  initialView = "ledger",
 }: {
   ledger: LedgerRow[];
   deals: PaymentRow[];
+  initialView?: View;
 }) {
-  const [view, setView] = useState<View>("ledger");
+  const [view, setView] = useState<View>(initialView);
 
   return (
     <div className="space-y-4">

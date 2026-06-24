@@ -48,6 +48,14 @@ export const PAYMENT_MODES = [
   "Other",
 ];
 
+// Coupon / token types an admin can issue to a salesperson (migration 0011).
+export const COUPON_TYPES: { value: string; label: string }[] = [
+  { value: "cab", label: "Cab Token" },
+  { value: "tools", label: "Tools Coupon" },
+  { value: "digital", label: "Digital Coupon" },
+  { value: "gold", label: "Gold Coupon" },
+];
+
 export const INDIAN_STATES = [
   "Tamil Nadu",
   "Karnataka",

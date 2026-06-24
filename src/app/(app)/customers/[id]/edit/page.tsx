@@ -30,7 +30,7 @@ export default async function EditCustomerPage({
       <PageHeader
         title="Edit Customer"
         subtitle={customer.name}
-        action={<Link href={`/customers/${id}`} className="btn-ghost">Cancel</Link>}
+        back={{ href: `/customers/${id}`, label: "← Back" }}
       />
 
       {err === "dup" && (

@@ -203,6 +203,7 @@ export const Icons = {
   barChart: BarChart,
   cube: Cube,
   plus: Plus,
+  trash: Trash,
 } as const;
 
 export type IconName = keyof typeof Icons;

@@ -4,18 +4,33 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  back,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  // Left-aligned back / cancel link rendered above the title. `label` is shown
+  // verbatim (include "←" yourself for nav links).
+  back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1.5 text-sm text-[var(--muted)]">{subtitle}</p>}
+    <div className="mb-7">
+      {back && (
+        <Link
+          href={back.href}
+          className="btn-ghost mb-3 inline-flex"
+          style={{ padding: "5px 12px", fontSize: 13 }}
+        >
+          {back.label}
+        </Link>
+      )}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight">{title}</h1>
+          {subtitle && <p className="mt-1.5 text-sm text-[var(--muted)]">{subtitle}</p>}
+        </div>
+        {action && <div className="flex items-center gap-2">{action}</div>}
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
   );
 }

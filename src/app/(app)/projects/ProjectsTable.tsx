@@ -74,7 +74,7 @@ export default function ProjectsTable({
     },
     {
       id: "plots",
-      header: "Plots",
+      header: "Available",
       align: "right",
       sort: (r) => r.plots,
       cell: (r) => <span className="tabular-nums font-medium">{r.plots}</span>,

@@ -29,6 +29,7 @@ export default async function AddProjectPage() {
       <PageHeader
         title="Add Project"
         subtitle="Set up a new development and configure its booking rules."
+        back={{ href: "/inventory/manage", label: "← Manage/Edit Plots" }}
       />
 
       <form action={createProject} className="max-w-3xl space-y-6">

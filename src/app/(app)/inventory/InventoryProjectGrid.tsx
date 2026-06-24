@@ -34,6 +34,7 @@ export default function InventoryProjectGrid({
   selectedId,
   title = "Select a Project",
   emptyHint,
+  variant = "grid",
 }: {
   projects: GridProject[];
   hrefBase?: string;
@@ -41,6 +42,8 @@ export default function InventoryProjectGrid({
   selectedId?: string | null;
   title?: string;
   emptyHint?: string;
+  // "grid" = card grid (3-up); "list" = one compact full-width row per project.
+  variant?: "grid" | "list";
 }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("avail_desc");
@@ -98,45 +101,58 @@ export default function InventoryProjectGrid({
           {emptyHint ?? "No projects match your search."}
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={variant === "list" ? "space-y-2" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
           {visible.map((p) => {
-            const inner = (
-              <>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="font-medium leading-tight text-[var(--text)]">{p.name}</div>
-                  <Badge tone={STATUS_TONE[p.status] ?? "gray"}>
-                    {p.status.replace(/_/g, " ")}
-                  </Badge>
-                </div>
-                <div className="mt-1 text-xs text-[var(--muted)]">
-                  {p.city}
-                  {p.district ? ` · ${p.district}` : ""}
-                </div>
-                <div className="mt-4 flex items-baseline gap-1.5 border-t border-[var(--border)] pt-3">
-                  <span className="text-lg font-semibold tabular-nums text-[var(--accent)]">
-                    {p.plots}
-                  </span>
-                  <span className="text-xs text-[var(--muted)]">
-                    plot{p.plots === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </>
-            );
             const selected = selectedId === p.id;
-            const className = `card block w-full text-left transition hover:-translate-y-0.5 hover:border-[var(--accent)] ${
-              selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : ""
-            }`;
+            const inner =
+              variant === "list" ? (
+                <div className="flex w-full items-center justify-between gap-4">
+                  <div className="min-w-0 truncate">
+                    <span className="font-medium text-[var(--text)]">{p.name}</span>
+                    <span className="ml-2 text-xs text-[var(--muted)]">
+                      {p.city}
+                      {p.district ? ` · ${p.district}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-sm">
+                      <span className="font-semibold tabular-nums text-[var(--accent)]">{p.plots}</span>{" "}
+                      <span className="text-xs text-[var(--muted)]">plot{p.plots === 1 ? "" : "s"}</span>
+                    </span>
+                    <Badge tone={STATUS_TONE[p.status] ?? "gray"}>{p.status.replace(/_/g, " ")}</Badge>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-medium leading-tight text-[var(--text)]">{p.name}</div>
+                    <Badge tone={STATUS_TONE[p.status] ?? "gray"}>{p.status.replace(/_/g, " ")}</Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-[var(--muted)]">
+                    {p.city}
+                    {p.district ? ` · ${p.district}` : ""}
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-1.5 border-t border-[var(--border)] pt-3">
+                    <span className="text-lg font-semibold tabular-nums text-[var(--accent)]">{p.plots}</span>
+                    <span className="text-xs text-[var(--muted)]">plot{p.plots === 1 ? "" : "s"}</span>
+                  </div>
+                </>
+              );
+            const className =
+              variant === "list"
+                ? `card block w-full text-left transition hover:border-[var(--accent)] ${
+                    selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : ""
+                  }`
+                : `card block w-full text-left transition hover:-translate-y-0.5 hover:border-[var(--accent)] ${
+                    selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : ""
+                  }`;
+            const style = variant === "list" ? { padding: "12px 16px" } : undefined;
             return hrefBase ? (
-              <Link key={p.id} href={`${hrefBase}/${p.id}`} className={className}>
+              <Link key={p.id} href={`${hrefBase}/${p.id}`} className={className} style={style}>
                 {inner}
               </Link>
             ) : (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onSelect?.(p.id)}
-                className={className}
-              >
+              <button key={p.id} type="button" onClick={() => onSelect?.(p.id)} className={className} style={style}>
                 {inner}
               </button>
             );

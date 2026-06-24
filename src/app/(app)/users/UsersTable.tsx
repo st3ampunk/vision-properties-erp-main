@@ -19,14 +19,25 @@ export interface UserRow {
   is_active: boolean;
 }
 
+// Which row actions the table exposes, driven by the Partners nav intent:
+//   manage    — both (default)
+//   view      — none (read-only list)
+//   block     — Block / Unblock only
+//   placement — Change Team / Level only
+export type UsersTableMode = "manage" | "view" | "block" | "placement";
+
 export default function UsersTable({
   rows,
   managers,
+  mode = "manage",
 }: {
   rows: UserRow[];
   managers: ManagerOption[];
+  mode?: UsersTableMode;
 }) {
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const showPlacement = mode === "manage" || mode === "placement";
+  const showBlock = mode === "manage" || mode === "block";
 
   const columns: Column<UserRow>[] = [
     { id: "name", header: "Name", sort: (r) => r.full_name.toLowerCase(), cell: (r) => (
@@ -36,25 +47,36 @@ export default function UsersTable({
     { id: "role", header: "Role", sort: (r) => r.role, cell: (r) => <Badge tone={r.role === "admin" ? "purple" : "blue"}>{ROLE_LABELS[r.role]}</Badge> },
     { id: "manager", header: "Reports To", hideBelow: "md", cell: (r) => <span className="text-[var(--muted)]">{r.manager || "—"}</span> },
     { id: "status", header: "Status", sort: (r) => String(r.is_active), cell: (r) => <Badge tone={r.is_active ? "green" : "gray"}>{r.is_active ? "Active" : "Inactive"}</Badge> },
-    { id: "action", header: "", align: "right", cell: (r) => (
-      <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => setEditing(r)}
-          className="btn-ghost"
-          style={{ padding: "5px 12px", fontSize: 12 }}
-        >
-          Change Team
-        </button>
-        <form action={toggleUserActive}>
-          <input type="hidden" name="id" value={r.id} />
-          <input type="hidden" name="next" value={String(!r.is_active)} />
-          <SubmitButton className="btn-ghost" style={{ padding: "5px 12px", fontSize: 12 }} pendingLabel="…">
-            {r.is_active ? "Block" : "Unblock"}
-          </SubmitButton>
-        </form>
-      </div>
-    ) },
+    ...(mode === "view"
+      ? []
+      : [{
+          id: "action",
+          header: "",
+          align: "right" as const,
+          cell: (r: UserRow) => (
+            <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+              {showPlacement && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(r)}
+                  className="btn-ghost"
+                  style={{ padding: "5px 12px", fontSize: 12 }}
+                >
+                  Change Team
+                </button>
+              )}
+              {showBlock && (
+                <form action={toggleUserActive}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <input type="hidden" name="next" value={String(!r.is_active)} />
+                  <SubmitButton className="btn-ghost" style={{ padding: "5px 12px", fontSize: 12 }} pendingLabel="…">
+                    {r.is_active ? "Block" : "Unblock"}
+                  </SubmitButton>
+                </form>
+              )}
+            </div>
+          ),
+        }]),
   ];
 
   const roleOptions = (Object.keys(ROLE_LABELS) as Role[]).map((r) => ({ value: r, label: ROLE_LABELS[r] }));
@@ -103,11 +125,16 @@ function ChangeTeamModal({
         <p className="mt-1 text-xs text-[var(--muted)]">
           {row.full_name} {row.code ? `· ${row.code}` : ""}
         </p>
+        <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--muted)]">
+          <b className="text-[var(--text-2)]">Their whole team moves with them.</b> Reassigning this
+          person to a new manager carries everyone beneath them too — e.g. move a Director under a
+          different Senior Director and that Director&apos;s entire downline moves along.
+        </div>
 
         <form action={updateUserPlacement} className="mt-4 space-y-4">
           <input type="hidden" name="id" value={row.id} />
           <div>
-            <label className="label">Level (Role)</label>
+            <label className="label">Promote / Change Level (Role)</label>
             <select name="role" className="select" defaultValue={row.role}>
               {assignableRoles.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>

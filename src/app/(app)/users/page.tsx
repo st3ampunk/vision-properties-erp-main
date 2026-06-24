@@ -1,15 +1,36 @@
 import { requireCapability } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
-import { type Role } from "@/lib/roles";
+import { isSalesRole, type Role } from "@/lib/roles";
 import { PageHeader } from "@/components/ui";
 import type { User } from "@/lib/types";
 import AddUserForm, { type ManagerOption } from "./AddUserForm";
 import UsersTable, { type UserRow } from "./UsersTable";
+import BusinessOperatorsTree, { type TreeUser } from "../business-operators/BusinessOperatorsTree";
 
 export const dynamic = "force-dynamic";
 
-export default async function UsersPage() {
+// Header copy per Partners nav intent (Add / View / Block / Change Team). The
+// page content is unchanged — the add form + table cover every intent.
+const HEADERS = {
+  new: { title: "Add New Partner", subtitle: "Create a partner / team member and place them in the hierarchy." },
+  block: { title: "Block Partner", subtitle: "Deactivate or re-activate a partner from the list below." },
+  placement: { title: "Change Team / Level", subtitle: "Reassign a partner's role or who they report to." },
+  view: {
+    title: "View Partner",
+    subtitle: "Who reports to whom — the full sales hierarchy. Expand a branch or add a member directly beneath any manager.",
+  },
+} as const;
+
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ action?: string; view?: string }>;
+}) {
   await requireCapability("manage_users");
+  const sp = await searchParams;
+  const intent =
+    sp.action === "new" ? "new" : sp.view === "block" ? "block" : sp.view === "placement" ? "placement" : "view";
+  const head = HEADERS[intent];
   const sb = getSupabase();
   const { data: users } = await sb
     .from("users")
@@ -38,23 +59,49 @@ export default async function UsersPage() {
     is_active: u.is_active,
   }));
 
-  return (
-    <>
-      <PageHeader
-        title="Users & Hierarchy"
-        subtitle="Admin, the sales chain (Senior Director → Director → Business Manager → Business Partner) and operators (Finance, Legal)."
-      />
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="card lg:col-span-1">
-          <h2 className="mb-4 text-sm font-semibold">Add User</h2>
+  // Add New Partner → just the form. Other intents → the table, with only the
+  // actions relevant to that intent (view = read-only, block, placement).
+  if (intent === "new") {
+    return (
+      <>
+        <PageHeader title={head.title} subtitle={head.subtitle} />
+        <div className="card max-w-xl">
+          <h2 className="mb-4 text-sm font-semibold">New Partner</h2>
           <AddUserForm managers={managers} />
         </div>
+      </>
+    );
+  }
 
-        <div className="lg:col-span-2">
-          <UsersTable rows={rows} managers={managers} />
-        </div>
-      </div>
+  // View Partner → the hierarchy tree (who reports to whom). Admin sees the whole
+  // sales org and can add a member directly under any node.
+  if (intent === "view") {
+    const treeNodes: TreeUser[] = list
+      .filter((u) => u.role === "admin" || isSalesRole(u.role as Role))
+      .map((u) => ({
+        id: u.id,
+        name: u.full_name,
+        email: u.email,
+        mobile: u.mobile,
+        role: u.role as Role,
+        code: u.partner_code ?? null,
+        managerId: u.manager_id,
+        active: u.is_active,
+      }));
+    return (
+      <>
+        <PageHeader title={head.title} subtitle={head.subtitle} />
+        <BusinessOperatorsTree nodes={treeNodes} />
+      </>
+    );
+  }
+
+  const tableMode = intent === "block" ? "block" : "placement";
+
+  return (
+    <>
+      <PageHeader title={head.title} subtitle={head.subtitle} />
+      <UsersTable rows={rows} managers={managers} mode={tableMode} />
     </>
   );
 }

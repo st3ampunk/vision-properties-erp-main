@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { requireCapability } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { PageHeader, EmptyState } from "@/components/ui";
-import { Plus } from "@/components/icons";
 import type { Project } from "@/lib/types";
 import InventoryProjectGrid, { type GridProject } from "../InventoryProjectGrid";
 
@@ -35,11 +33,6 @@ export default async function ManageInventoryPage() {
       <PageHeader
         title="Manage/Edit Plots"
         subtitle="Open any project to edit its details and manage its plots."
-        action={
-          <Link href="/inventory/add-project" className="btn-primary">
-            <Plus size={16} /> Add Project
-          </Link>
-        }
       />
       {projects.length === 0 ? (
         <div className="card">
@@ -51,8 +44,9 @@ export default async function ManageInventoryPage() {
       ) : (
         <InventoryProjectGrid
           projects={projects}
-          hrefBase="/projects"
+          hrefBase="/inventory/manage"
           title="All Projects"
+          variant="list"
         />
       )}
     </>

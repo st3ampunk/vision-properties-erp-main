@@ -18,11 +18,11 @@ export default async function ProjectsPage() {
   const sb = getSupabase();
   const { data } = await sb
     .from("projects")
-    .select("*, plots(count)")
+    .select("*, plots(status)")
     .order("created_at", { ascending: false });
 
   const raw = (data ?? []) as (Project & {
-    plots: { count: number }[];
+    plots: { status: string }[];
   })[];
 
   const rows: ProjectRow[] = raw.map((p) => ({
@@ -34,7 +34,9 @@ export default async function ProjectsPage() {
     approval_type: p.approval_type,
     project_type: p.project_type,
     status: p.status,
-    plots: p.plots?.[0]?.count ?? 0,
+    // Sales only see AVAILABLE inventory — booked, blocked and cancelled
+    // (reserved until an admin releases) plots don't count here.
+    plots: (p.plots ?? []).filter((pl) => pl.status === "available").length,
     advance_percent: p.advance_percent,
   }));
 

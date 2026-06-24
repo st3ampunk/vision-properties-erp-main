@@ -13,6 +13,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import { computeRefund } from "@/lib/sop";
+import { PAYMENT_MODES } from "@/lib/options";
 import PrintReceiptButton from "./PrintReceiptButton";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { Booking, Customer, Payment, Plot, Project, PlotTransfer } from "@/lib/types";
@@ -116,12 +117,8 @@ export default async function BookingDetailPage({
       <PageHeader
         title={`${b.book_mode === "blocking" ? "Blocking" : "Booking"} — ${b.plots.plot_no}`}
         subtitle={`${b.projects.name} · ${b.customers.name} (${b.customers.mobile})`}
-        action={
-          <div className="flex gap-2">
-            <PrintReceiptButton id={b.id} />
-            <Link href="/bookings" className="btn-ghost">← Bookings</Link>
-          </div>
-        }
+        back={{ href: "/bookings", label: "← Bookings" }}
+        action={<PrintReceiptButton id={b.id} />}
       />
 
       {/* Status strip */}
@@ -351,7 +348,12 @@ export default async function BookingDetailPage({
                 </div>
                 <div>
                   <label className="label">Mode</label>
-                  <input name="mode" className="input" placeholder="Cash / UPI / Bank" />
+                  <select name="mode" className="select" defaultValue="">
+                    <option value="" disabled>Select mode</option>
+                    {PAYMENT_MODES.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
                 </div>
                 <SubmitButton className="btn-primary w-full" pendingLabel="Adding…">Add Payment</SubmitButton>
                 <p className="text-xs text-[var(--muted)]">
