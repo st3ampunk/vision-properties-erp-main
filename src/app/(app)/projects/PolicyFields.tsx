@@ -18,16 +18,11 @@ export default function PolicyFields({ p }: { p?: Partial<Project> }) {
           for this project.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className="label">Branch</label>
-            <input name="branch" className="input" defaultValue={p?.branch ?? ""} placeholder="e.g. Chennai" />
-          </div>
-          <Num name="guideline_value" label="Guideline Value (₹ / sq.ft)" def={v("guideline_value", 0)} step={50} />
-          <Num name="director_gold_coupon" label="Director Gold Coupon (₹ / sq.ft)" def={v("director_gold_coupon", 0)} step={50} />
-          <Num name="director_digital_coupon" label="Director Digital Coupon (₹ / sq.ft)" def={v("director_digital_coupon", 0)} step={50} />
-          <Num name="senior_director_gold_coupon" label="Senior Director Gold Coupon (₹ / sq.ft)" def={v("senior_director_gold_coupon", 0)} step={50} />
-          <Num name="director_tools_coupon" label="Director Tools Coupon (₹ / sq.ft)" def={v("director_tools_coupon", 0)} step={50} />
-          <Num name="senior_director_tools_coupon" label="Senior Director Tools Coupon (₹ / sq.ft)" def={v("senior_director_tools_coupon", 0)} step={50} />
+          <Num name="guideline_value" label="Guideline Value (₹ / sq.ft)" def={v("guideline_value", 0)} />
+          <Num name="director_gold_coupon" label="Director Gold Coupon (₹ / sq.ft)" def={v("director_gold_coupon", 0)} />
+          <Num name="director_digital_coupon" label="Director Digital Coupon (₹ / sq.ft)" def={v("director_digital_coupon", 0)} />
+          <Num name="senior_director_gold_coupon" label="Senior Director Gold Coupon (₹ / sq.ft)" def={v("senior_director_gold_coupon", 0)} />
+          <Num name="director_tools_coupon" label="Director Tools Coupon (₹ / sq.ft)" def={v("director_tools_coupon", 0)} />
         </div>
       </div>
 
@@ -39,10 +34,10 @@ export default function PolicyFields({ p }: { p?: Partial<Project> }) {
           percentage or the booking amount.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Num name="blocking_amount" label="Blocking Amount (₹)" def={v("blocking_amount", 10000)} step={1000} />
+          <Num name="blocking_amount" label="Blocking Amount (₹)" def={v("blocking_amount", 10000)} />
           <Num name="blocking_window_hours" label="Blocking Validity (hours)" def={v("blocking_window_hours", 48)} min={1} />
-          <Num name="advance_min_amount" label="Booking Amount (₹)" def={v("advance_min_amount", 50000)} step={1000} />
-          <Num name="advance_percent" label="Booking Percentage (% of plot value)" def={v("advance_percent", 5)} step={0.5} />
+          <Num name="advance_min_amount" label="Booking Amount (₹)" def={v("advance_min_amount", 50000)} />
+          <Num name="advance_percent" label="Booking Percentage (% of plot value)" def={v("advance_percent", 5)} max={100} />
           <Num name="booking_window_days" label="Validity (days)" def={v("booking_window_days", 15)} min={1} />
         </div>
       </div>
@@ -55,7 +50,7 @@ export default function PolicyFields({ p }: { p?: Partial<Project> }) {
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Num name="cancel_full_refund_days" label="Full-refund Window (days)" def={v("cancel_full_refund_days", 3)} min={0} />
-          <Num name="cancellation_charge" label="Admin Charge / plot (₹)" def={v("cancellation_charge", 5000)} step={500} />
+          <Num name="cancellation_charge" label="Admin Charge / plot (₹)" def={v("cancellation_charge", 5000)} />
           <Num name="refund_processing_days" label="Refund Payout SLA (working days)" def={v("refund_processing_days", 5)} min={0} />
         </div>
       </div>
@@ -66,7 +61,7 @@ export default function PolicyFields({ p }: { p?: Partial<Project> }) {
           Charge applied when a booking is moved to a lower-value plot (downgrade). Upgrades are free.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Num name="transfer_charge" label="Transfer / Downgrade Charge (₹)" def={v("transfer_charge", 5000)} step={500} />
+          <Num name="transfer_charge" label="Transfer / Downgrade Charge (₹)" def={v("transfer_charge", 5000)} />
         </div>
       </div>
     </>
@@ -78,18 +73,21 @@ function Num({
   label,
   def,
   min = 0,
-  step,
+  max,
 }: {
   name: string;
   label: string;
   def: number;
   min?: number;
-  step?: number;
+  max?: number;
 }) {
+  // step="any" so any rupee/percentage value is accepted. A fixed step (e.g. 50)
+  // makes the browser reject values off the step grid with "enter a valid value",
+  // which blocked project creation on the coupon/booking fields.
   return (
     <div>
       <label className="label">{label}</label>
-      <input name={name} type="number" min={min} step={step} className="input" defaultValue={def} />
+      <input name={name} type="number" min={min} max={max} step="any" className="input" defaultValue={def} />
     </div>
   );
 }

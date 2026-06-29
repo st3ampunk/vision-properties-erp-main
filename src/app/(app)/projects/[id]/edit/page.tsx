@@ -50,6 +50,10 @@ export default async function EditProjectPage({
               <input name="city" className="input" required defaultValue={p.city} />
             </div>
             <div>
+              <label className="label">Pincode</label>
+              <input name="pincode" className="input" inputMode="numeric" maxLength={6} placeholder="6-digit PIN" defaultValue={p.pincode ?? ""} />
+            </div>
+            <div>
               <label className="label">Extent *</label>
               <input name="area" className="input" placeholder="e.g. 12 acres" required defaultValue={p.area} />
             </div>

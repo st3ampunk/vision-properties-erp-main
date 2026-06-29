@@ -41,6 +41,7 @@ export interface Project {
   name: string;
   district: string;
   city: string;
+  pincode: string | null;
   remarks: string | null;
   area: string;
   land_type: string | null;

@@ -98,6 +98,10 @@ export default function ManageProjectClient({
                 <input name="city" className="input" required defaultValue={project.city} />
               </div>
               <div>
+                <label className="label">Pincode</label>
+                <input name="pincode" className="input" inputMode="numeric" maxLength={6} placeholder="6-digit PIN" defaultValue={project.pincode ?? ""} />
+              </div>
+              <div>
                 <label className="label">Extent *</label>
                 <input name="area" className="input" required defaultValue={project.area} />
               </div>

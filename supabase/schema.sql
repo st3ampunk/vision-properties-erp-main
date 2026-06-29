@@ -167,6 +167,7 @@ create table if not exists projects (
   name           text          not null,                       -- 1. Project Name*
   district       text          not null,                       -- 2. District*
   city           text          not null,                       -- 3. City*
+  pincode        text,                                          -- 3a. Pincode (optional reference)
   remarks        text,                                         -- 4. Remarks (legacy/optional)
   area           text          not null,                       -- 5. Extent / Area*
   land_type      text,                                         -- 6. Land Type (legacy/optional)
