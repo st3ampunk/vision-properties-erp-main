@@ -4,7 +4,7 @@
   "private": true,
   "description": "Vision Properties — Plot Booking & Inventory Management Platform (v0.1 MVP)",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

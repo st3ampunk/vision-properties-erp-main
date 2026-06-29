@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import type { Role } from "./roles";
@@ -60,30 +61,37 @@ export async function destroySession(): Promise<void> {
   store.delete(COOKIE_NAME);
 }
 
-export async function getSession(): Promise<SessionUser | null> {
-  const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret());
-    const sessionUser: SessionUser = {
-      id: payload.id as string,
-      full_name: payload.full_name as string,
-      email: payload.email as string,
-      role: payload.role as Role,
-    };
-    // "Sign out everywhere" bumps the user's session_version; a token stamped
-    // with an older version is rejected. Fail open (only reject on a definite
-    // mismatch) so a missing column / DB hiccup never locks anyone out.
-    const tokenSv = payload.sv as number | undefined;
-    if (typeof tokenSv === "number") {
-      const current = await currentSessionVersion(sessionUser.id);
-      if (current !== null && current !== tokenSv) return null;
+// Wrapped in React's cache() so a single request render dedupes the cookie read,
+// JWT verify and the session_version DB round-trip. Without this, every
+// requireUser()/requireCapability() call (layout + each page + nested
+// components — dozens per request) re-ran the remote auth query serially, which
+// was the main source of slow page loads.
+export const getSession = cache(
+  async function getSession(): Promise<SessionUser | null> {
+    const store = await cookies();
+    const token = store.get(COOKIE_NAME)?.value;
+    if (!token) return null;
+    try {
+      const { payload } = await jwtVerify(token, secret());
+      const sessionUser: SessionUser = {
+        id: payload.id as string,
+        full_name: payload.full_name as string,
+        email: payload.email as string,
+        role: payload.role as Role,
+      };
+      // "Sign out everywhere" bumps the user's session_version; a token stamped
+      // with an older version is rejected. Fail open (only reject on a definite
+      // mismatch) so a missing column / DB hiccup never locks anyone out.
+      const tokenSv = payload.sv as number | undefined;
+      if (typeof tokenSv === "number") {
+        const current = await currentSessionVersion(sessionUser.id);
+        if (current !== null && current !== tokenSv) return null;
+      }
+      return sessionUser;
+    } catch {
+      return null;
     }
-    return sessionUser;
-  } catch {
-    return null;
-  }
-}
+  },
+);
 
 export const SESSION_COOKIE = COOKIE_NAME;

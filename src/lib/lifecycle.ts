@@ -23,28 +23,32 @@ export async function sweepExpiredBookings(): Promise<number> {
 
   if (!expired || expired.length === 0) return 0;
 
-  let released = 0;
-  for (const b of expired) {
-    // Fully paid bookings are never auto-released even if a window passed.
-    if (b.payment_status === "completed") continue;
+  // Fully paid bookings are never auto-released even if a window passed.
+  const toRelease = expired.filter((b) => b.payment_status !== "completed");
+  if (toRelease.length === 0) return 0;
 
-    await sb
-      .from("bookings")
-      .update({ status: "cancelled", released_at: nowIso })
-      .eq("id", b.id);
+  // Release in parallel — this sweep is awaited before several list pages
+  // render, so a serial loop would add one round-trip per expired booking to
+  // every page load.
+  await Promise.all(
+    toRelease.map(async (b) => {
+      await sb
+        .from("bookings")
+        .update({ status: "cancelled", released_at: nowIso })
+        .eq("id", b.id);
 
-    await sb
-      .from("plots")
-      .update({ status: "available" })
-      .eq("id", b.plot_id);
+      await sb
+        .from("plots")
+        .update({ status: "available" })
+        .eq("id", b.plot_id);
 
-    await notify(
-      b.id,
-      "sms",
-      null,
-      "Your hold has expired and the plot has been released back to Vision Properties.",
-    );
-    released++;
-  }
-  return released;
+      await notify(
+        b.id,
+        "sms",
+        null,
+        "Your hold has expired and the plot has been released back to Vision Properties.",
+      );
+    }),
+  );
+  return toRelease.length;
 }
