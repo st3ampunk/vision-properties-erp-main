@@ -243,10 +243,10 @@ export type Capability =
   | "create_blocking"
   | "create_booking"
   | "approve_booking"
-  // Admin and the Post-Sales desk. Every blocking/booking is raised as 'pending'
-  // and does nothing to the plot until one of them confirms it here — see
-  // confirmBooking. A Pre-Sales desk raises holds but does not confirm them, so
-  // the two halves of a branch stay separate.
+  // Admin, the branch General Manager and the combined Pre & Post-Sales desk.
+  // Every blocking/booking is raised as 'pending' and does nothing to the plot
+  // until one of them confirms it here — see confirmBooking. A plain Pre-Sales
+  // or Post-Sales desk raises holds but does not confirm them.
   | "confirm_booking"
   | "cancel_booking"
   | "request_cancellation"
@@ -274,11 +274,10 @@ export type Capability =
   // desk works the queue day to day and needs to see what is waiting and chase
   // it, but the release itself stays the Admin's call.
   | "view_plot_release"
-  // ADMIN ONLY — and the only capability deliberately NOT in ADMIN_CAPS, so a
-  // General Manager (who otherwise holds that whole set) cannot reset anyone's
-  // password. Resetting a login is the one action that hands over another
-  // person's identity, so it stays with the company Admin rather than being
-  // delegated to a branch. See resetUserPassword in users/actions.ts.
+  // Admin and General Manager. NOT confined to the GM's district: a locked-out
+  // partner or desk in any branch can be reset by either. Resetting a login
+  // hands over another person's identity, so resetUserPassword (users/actions.ts)
+  // makes the actor re-enter their own password and never touches an Admin.
   | "reset_password"
   // Issue / redeem tokens & coupons on the Issue Token page. Split out from
   // `manage_users` (admin-only) so the Pre-Sales desk can hand a Cab Token to a
@@ -310,8 +309,8 @@ const PRE_SALES_CAPS: Capability[] = [
 // Post-Sales: everything after the deal is signed — collections, receipts,
 // cancellation + refund, and registration. Blocking / booking now sits in the
 // Post-Sales section of the sidebar and is worked by BOTH branch desks, so this
-// desk holds the create powers too — AND confirms them: whoever raises a hold
-// (a sales role, Pre-Sales, or this desk), Admin or Post-Sales makes it real.
+// desk holds the create powers too — but does NOT confirm them (nor release a
+// partner's bill): that is Admin, the branch GM, or the combined desk.
 // Releasing a plot back to inventory is this desk's own queue too.
 const POST_SALES_CAPS: Capability[] = [
   // Both desks work the client book and look partners up — a Post-Sales desk
@@ -320,10 +319,6 @@ const POST_SALES_CAPS: Capability[] = [
   "view_partners",
   "create_blocking",
   "create_booking",
-  // Whoever raises a blocking/booking, the desk that owns it confirms it —
-  // Admin or Post-Sales. confirmBooking is district-scoped (bookingInScope), so
-  // a branch desk can only confirm deals in its OWN branch's projects.
-  "confirm_booking",
   "record_payment",
   "cancel_booking",
   "approve_refund",
@@ -365,17 +360,16 @@ const ADMIN_CAPS: Capability[] = [
   "view_post_sales",
   "release_plot",
   "view_plot_release",
+  "reset_password",
 ];
 
 const CAPABILITIES: Record<Role, Capability[]> = {
-  // `reset_password` is added HERE rather than to ADMIN_CAPS on purpose: it is
-  // the one power a General Manager must not inherit (see the capability's note
-  // above). Everything else the two roles hold stays derived from one list.
-  admin: [...ADMIN_CAPS, "reset_password"],
-  // Same powers as Admin, confined to one branch by isDistrictScoped above.
+  admin: ADMIN_CAPS,
+  // Same powers as Admin, confined to one branch by isDistrictScoped above
+  // (`reset_password` excepted — that one reaches every branch).
   general_manager: ADMIN_CAPS,
   // No sales role holds `confirm_booking`, `cancel_booking` or `release_plot` —
-  // those sit with Admin and the Post-Sales desk. A sales role raises a
+  // those sit with Admin, the GM and the branch desks. A sales role raises a
   // blocking/booking as 'pending' and waits for one of them to confirm it; to
   // undo one it files a `request_cancellation` (with a reason) for them to
   // action — see Payments & Cancellation.
@@ -423,7 +417,10 @@ const CAPABILITIES: Record<Role, Capability[]> = {
   // re-listed so widening either desk widens this automatically. Holding both
   // `cancel_booking` and `request_cancellation` is harmless — every cancel UI
   // offers the request only when the direct power is absent.
-  pre_post_sales: [...new Set([...PRE_SALES_CAPS, ...POST_SALES_CAPS])],
+  // `confirm_booking` is this desk's own, held by neither half: it is the
+  // branch's approver where there is no General Manager. Scoped to its own
+  // district by bookingInScope.
+  pre_post_sales: [...new Set([...PRE_SALES_CAPS, ...POST_SALES_CAPS, "confirm_booking" as const])],
   // Digital: login only for now — the desk's scope is not defined yet, so it
   // gets the dashboard and nothing else rather than a guessed set of powers.
   digital: [],
@@ -432,4 +429,12 @@ const CAPABILITIES: Record<Role, Capability[]> = {
 export function can(role: Role | undefined | null, cap: Capability): boolean {
   if (!role) return false;
   return CAPABILITIES[role]?.includes(cap) ?? false;
+}
+
+// Who is shown an EXPIRED hold for what it is — still live, still holding its
+// plot — instead of the "it auto-released" story in lib/holds. Admin and the GM,
+// plus whoever approves deals (`confirm_booking`): an approver cannot confirm a
+// booking or release its bill if the page renders it as cancelled.
+export function seesExpiredHolds(role: Role | undefined | null): boolean {
+  return hasFullAccess(role) || can(role, "confirm_booking");
 }

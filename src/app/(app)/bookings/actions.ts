@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 import { requireCapability } from "@/lib/auth";
-import { can, hasFullAccess, type Role } from "@/lib/roles";
+import { can, seesExpiredHolds, type Role } from "@/lib/roles";
 import { logAudit, notify } from "@/lib/audit";
 import { bookingInScope, plotInScope } from "@/lib/scope";
 import { isFlaggedExpired } from "@/lib/holds";
@@ -67,17 +67,17 @@ function firstMissing(f: FormData, keys: readonly string[]): string | null {
 // Instrument details captured alongside a payment (cheque no / UTR / UPI txn id
 // / lender + a date). Which of these the form actually collected depends on the
 // selected Mode (see PAYMENT_MODE_FIELDS) — we just persist whatever was sent.
-// An expired hold reads as auto-released to everyone but an Admin (see
-// lib/holds), so a non-admin must not be able to act on one either — a stale tab
-// or a hand-rolled POST would otherwise quietly touch a deal the user has been
-// shown as dead. Admins are unaffected: the hold really is still live for them.
+// An expired hold reads as auto-released to everyone but an Admin or approver
+// (seesExpiredHolds, lib/holds), so the rest must not be able to act on one
+// either — a stale tab or a hand-rolled POST would otherwise quietly touch a
+// deal the user has been shown as dead.
 // Returns true when the caller should stop.
 async function hiddenFromActor(
   sb: ReturnType<typeof getSupabase>,
   actor: { role: string },
   bookingId: string,
 ): Promise<boolean> {
-  if (hasFullAccess(actor.role as Role)) return false;
+  if (seesExpiredHolds(actor.role as Role)) return false;
   const { data } = await sb
     .from("bookings")
     .select("status, expired_at")
@@ -206,7 +206,7 @@ export async function createBooking(formData: FormData): Promise<void> {
     // give the Admin's pending decision away. They get a neutral per-plot
     // problem instead. The page re-derives both cases from live data; `err` is
     // only the fallback for when the claim clears in between.
-    const masked = isFlaggedExpired(held) && !hasFullAccess(actor.role);
+    const masked = isFlaggedExpired(held) && !seesExpiredHolds(actor.role as Role);
     const err = masked ? "plot_issue" : `held&held=${held.book_mode}`;
     redirect(`/bookings/new?plot=${plot_id}&mode=${mode}&err=${err}`);
   }
@@ -834,11 +834,11 @@ export async function updateBooking(formData: FormData): Promise<void> {
 // ---------------------------------------------------------------------------
 // CONFIRM / CANCEL (board: Booking List actions)
 // ---------------------------------------------------------------------------
-// ADMIN or the POST-SALES desk (`confirm_booking`). This is the step that makes
-// a hold real: a blocking/booking sits at 'pending' with the plot still reading
-// 'available' until one of them lands here, and only now does the plot leave
-// inventory. A branch desk is held to its own district by bookingInScope below,
-// so Post-Sales confirms its branch's deals and nobody else's.
+// ADMIN, the branch GM or the combined desk (`confirm_booking`). This is the
+// step that makes a hold real: a blocking/booking sits at 'pending' with the
+// plot still reading 'available' until one of them lands here, and only now
+// does the plot leave inventory. A GM or desk is held to its own district by
+// bookingInScope below, so each confirms its branch's deals and nobody else's.
 export async function confirmBooking(formData: FormData): Promise<void> {
   const actor = await requireCapability("confirm_booking");
   const sb = getSupabase();

@@ -129,8 +129,7 @@ export default async function UsersPage({
   return (
     <>
       <PageHeader title={head.title} subtitle={head.subtitle} />
-      {/* Reset Password is Admin-only: a General Manager holds `manage_users`
-          and reaches this page, but not `reset_password`. */}
+      {/* Reset Password: Admin or a General Manager (`reset_password`). */}
       <UsersTable
         rows={rows}
         managers={managers}

@@ -4,6 +4,7 @@ import { requireCapability } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { getDistrictScope, seesAllRecords } from "@/lib/scope";
 import { isFlaggedExpired } from "@/lib/holds";
+import { seesExpiredHolds } from "@/lib/roles";
 import { ownBookedCustomerIds, ownCustomerOrFilter, branchCustomerOrFilter } from "@/lib/customers";
 import { CASH_LIMIT_LABEL } from "@/lib/options";
 import { PageHeader } from "@/components/ui";
@@ -49,7 +50,7 @@ export default async function NewBookingPage({
   // naming it would give away the Admin's pending decision. They get a neutral
   // "something is wrong with this plot" instead. Admin sees the real reason.
   const maskedIssue =
-    (claim ? isFlaggedExpired(claim) && !isAdmin : false) || (!claim && sp.err === "plot_issue");
+    (claim ? isFlaggedExpired(claim) && !seesExpiredHolds(user.role) : false) || (!claim && sp.err === "plot_issue");
   const heldAs = maskedIssue
     ? null
     : claim?.book_mode ?? (sp.err === "held" ? sp.held ?? "blocking" : null);

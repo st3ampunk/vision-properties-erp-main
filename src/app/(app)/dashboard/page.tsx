@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import type { SessionUser } from "@/lib/session";
-import { can, isSalesRole, isNetworkHead, hasFullAccess, ROLE_LABELS } from "@/lib/roles";
+import { can, isSalesRole, isNetworkHead, hasFullAccess, seesExpiredHolds, ROLE_LABELS } from "@/lib/roles";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 import { getDistrictScope } from "@/lib/scope";
 import { getDashboard, getAdminInsights, getSalesDashboard, getSeniorOverview } from "@/lib/queries";
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
   // Admin (and Finance/Legal) see company-wide figures; a branch GM sees their
   // district's. Only a full-access account sees an expired hold for what it is;
   // everyone else is shown it as though it had auto-released (lib/holds).
-  const maskExpired = !hasFullAccess(user.role);
+  const maskExpired = !seesExpiredHolds(user.role);
   const d = await getDashboard(
     scope
       ? { userId: user.id, projectIds: scope.projectIds, district: scope.district, maskExpired }

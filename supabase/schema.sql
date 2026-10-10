@@ -78,7 +78,7 @@ create table if not exists users (
   password_hash text        not null,
   mobile        text,
   role          user_role   not null,
-  partner_code  text,                    -- sales ID: SD#/D#/BM#/BP# (auto-assigned; NULL for admin/finance/legal)
+  partner_code  text,                    -- sales ID: VPSD##/VPD##/VPBM##/VPBP## (NULL for staff)
   manager_id    uuid        references users(id) on delete set null,
   city          text,                    -- home city: sales panels show this city's inventory first
   -- Business Partner Registration Form (0025) — captured only for role
@@ -102,7 +102,7 @@ create index if not exists idx_users_manager     on users(manager_id);
 create unique index if not exists uniq_users_partner_code on users(partner_code) where partner_code is not null;
 
 -- Human-readable sales ID per role (NULL for non-sales roles), auto-assigned on
--- insert by a trigger so every insert path produces a consistent, unique code.
+-- insert and role change by a trigger so every path produces a consistent code.
 -- Code = VP + role code + 2 random digits (VPSD##/VPD##/VPBM##/VPBP##), retried
 -- on collision and widened automatically if a role's space gets crowded.
 create or replace function sales_code_prefix(r user_role)
@@ -140,16 +140,27 @@ create or replace function assign_partner_code()
 returns trigger language plpgsql as $$
 declare
   pfx text;
+  candidate text;
 begin
   pfx := sales_code_prefix(new.role);
   if pfx is null then
     new.partner_code := null;
     return new;
   end if;
-  if new.partner_code is not null and new.partner_code <> '' then
+  if tg_op = 'INSERT' and new.partner_code is not null and new.partner_code <> '' then
     return new;
   end if;
   perform pg_advisory_xact_lock(hashtext('partner_code:' || pfx));
+  if tg_op = 'UPDATE' then
+    -- Keep the person's number when it is free at the new level.
+    if old.partner_code ~ '^VP[A-Z]+[0-9]+$' then
+      candidate := pfx || substring(old.partner_code from '[0-9]+$');
+      if not exists (select 1 from users where partner_code = candidate and id <> new.id) then
+        new.partner_code := candidate;
+        return new;
+      end if;
+    end if;
+  end if;
   new.partner_code := next_partner_code(pfx);
   return new;
 end;
@@ -157,7 +168,7 @@ $$;
 
 drop trigger if exists trg_assign_partner_code on users;
 create trigger trg_assign_partner_code
-  before insert on users
+  before insert or update of role on users
   for each row execute function assign_partner_code();
 
 -- ---------------------------------------------------------------------------

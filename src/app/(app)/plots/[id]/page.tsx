@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
-import { can, hasFullAccess } from "@/lib/roles";
+import { can, seesExpiredHolds } from "@/lib/roles";
 import { sweepExpiredBookings } from "@/lib/lifecycle";
 import { isFlaggedExpired } from "@/lib/holds";
 import { inr, fmtDate, fmtDateTime, timeLeft } from "@/lib/format";
@@ -50,8 +50,7 @@ export default async function PlotDetailPage({
   // An expired hold reads as auto-released to everyone but an Admin (lib/holds),
   // so its record is hidden here too — otherwise this page would show the deal a
   // salesperson has just been told is over.
-  const isAdmin = hasFullAccess(user.role);
-  const maskedHold = Boolean(live) && !isAdmin && isFlaggedExpired(live!);
+  const maskedHold = Boolean(live) && !seesExpiredHolds(user.role) && isFlaggedExpired(live!);
   const booking = maskedHold ? null : live;
 
   // Sales roles may BLOCK; only Admin may BOOK.

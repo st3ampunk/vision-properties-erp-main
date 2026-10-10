@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import DataTable, { type Column } from "@/components/DataTable";
 import { Badge } from "@/components/ui";
 import { ROLE_LABELS, ROLES, hasFullAccess, type Role } from "@/lib/roles";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { ManagerOption } from "./AddUserForm";
 import { ResetPasswordModal } from "./ResetPassword";
-import { toggleUserActive, updateUserPlacement } from "./actions";
+import { toggleUserActive, updateUserPlacement, type PlacementState } from "./actions";
 
 export interface UserRow {
   id: string;
@@ -37,10 +37,9 @@ export default function UsersTable({
   managers: ManagerOption[];
   mode?: UsersTableMode;
   /**
-   * Show the Reset Password action. Driven by the `reset_password` capability,
-   * which only the company Admin holds — a General Manager reaches this same
-   * page (they have `manage_users`) and must NOT see the button. The server
-   * action re-checks the capability, so this is presentation only.
+   * Show the Reset Password action. Driven by the `reset_password` capability
+   * (Admin or a General Manager). The server action re-checks the capability,
+   * so this is presentation only.
    */
   canResetPassword?: boolean;
 }) {
@@ -135,6 +134,11 @@ function ChangeTeamModal({
   // Anyone may be a parent except the user themselves.
   const parents = managers.filter((m) => m.id !== row.id);
   const assignableRoles = ROLES.filter((r) => r !== "admin");
+  const [state, formAction] = useActionState(updateUserPlacement, {} as PlacementState);
+
+  useEffect(() => {
+    if (state.updated) onClose();
+  }, [state.updated, onClose]);
 
   return (
     <div
@@ -153,7 +157,7 @@ function ChangeTeamModal({
           different Senior Director and that Director&apos;s entire downline moves along.
         </div>
 
-        <form action={updateUserPlacement} className="mt-4 space-y-4">
+        <form action={formAction} className="mt-4 space-y-4">
           <input type="hidden" name="id" value={row.id} />
           <div>
             <label className="label">Promote / Change Level (Role)</label>
@@ -162,6 +166,9 @@ function ChangeTeamModal({
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Changing the level updates the sales ID to its new prefix. The current number is kept when available.
+            </p>
           </div>
           <div>
             <label className="label">Reports To</label>
@@ -177,6 +184,7 @@ function ChangeTeamModal({
               Must be a role that can manage the chosen level, or the company itself. Invalid choices are rejected.
             </p>
           </div>
+          {state.error && <p role="alert" className="text-sm text-red-500">{state.error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
             <SubmitButton pendingLabel="Saving…">Save</SubmitButton>

@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
-import { can, isSalesRole, isDistrictScoped, hasFullAccess } from "@/lib/roles";
+import { can, isSalesRole, isDistrictScoped, hasFullAccess, seesExpiredHolds } from "@/lib/roles";
 import { shownStatus, shownPlotStatus } from "@/lib/holds";
 import { getDownlineIds } from "@/lib/hierarchy";
 import { getDistrictScope } from "@/lib/scope";
@@ -26,6 +26,7 @@ export default async function BookingsPage({
   const sp = await searchParams;
   const mode = sp.mode === "blocking" ? "blocking" : sp.mode === "booking" ? "booking" : null;
   const isAdmin = hasFullAccess(user.role);
+  const seesHolds = seesExpiredHolds(user.role);
   // Who sold it matters to anyone looking at other people's deals — Admin, a
   // sales manager, and a branch desk working its whole district.
   const showSalesperson =
@@ -105,10 +106,10 @@ export default async function BookingsPage({
       balance: Math.max(0, b.total_plot_value - b.advance_paid),
       booked_date: b.booked_date,
       book_mode: b.book_mode,
-      // Non-admins are shown an expired hold as if it had auto-released — the
-      // Admin's pending decision is invisible to them. See lib/holds.
-      status: shownStatus(b, isAdmin),
-      plotStatus: shownPlotStatus(b, b.plots?.status ?? null, isAdmin),
+      // Everyone but Admin and the approvers is shown an expired hold as if it
+      // had auto-released — the pending decision is invisible to them. See lib/holds.
+      status: shownStatus(b, seesHolds),
+      plotStatus: shownPlotStatus(b, b.plots?.status ?? null, seesHolds),
       payment_status: b.payment_status,
       refund_status: b.refund_status,
       expires_at: b.expires_at,

@@ -51,9 +51,9 @@ export default async function SettingsPage({
   const { err, ok, tab: tabParam } = await searchParams;
 
   const sb = getSupabase();
-  // Resetting SOMEONE ELSE's password is Admin-only — `reset_password` is the one
-  // capability a General Manager does not inherit (see lib/roles.ts). Changing
-  // your OWN password is not gated: everyone on this page gets that.
+  // Resetting SOMEONE ELSE's password needs `reset_password` — Admin or a
+  // General Manager, for every branch (see lib/roles.ts). Changing your OWN
+  // password is not gated: everyone on this page gets that.
   const canReset = can(user.role as Role, "reset_password");
 
   // Everything password-related lives on one tab, including the signed-in user's
@@ -149,7 +149,7 @@ export default async function SettingsPage({
             </form>
           </div>
 
-          {/* 2 · Reset someone else's. Admin only. The same control sits on each
+          {/* 2 · Reset someone else's (`reset_password`). The same control sits on each
               row of Business Partners › Block / Change Team & Level; this one
               starts from a search, for when they ring up locked out. */}
           {canReset && (

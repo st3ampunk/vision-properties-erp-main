@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
-import { can, hasFullAccess } from "@/lib/roles";
+import { can, seesExpiredHolds } from "@/lib/roles";
 import { sweepExpiredBookings } from "@/lib/lifecycle";
 import { getDistrictScope, projectInScope } from "@/lib/scope";
 import { shownStatus } from "@/lib/holds";
@@ -119,12 +119,11 @@ export default async function BookingDetailPage({
   };
 
   // An expired hold is still live and still holding its plot, pending an Admin's
-  // release-or-extend decision — but only the Admin may know that. For everyone
-  // else the whole page is rendered from a copy whose status reads 'cancelled',
-  // so every badge, deadline and action gate below behaves exactly as it did
-  // when expiry auto-released the plot. See lib/holds.
-  const isAdmin = hasFullAccess(user.role);
-  const b = { ...raw, status: shownStatus(raw, isAdmin) };
+  // release-or-extend decision — but only the Admin and the approvers may know
+  // that. For everyone else the whole page is rendered from a copy whose status
+  // reads 'cancelled', so every badge, deadline and action gate below behaves
+  // exactly as it did when expiry auto-released the plot. See lib/holds.
+  const b = { ...raw, status: shownStatus(raw, seesExpiredHolds(user.role)) };
 
   // Hold deadline = expires_at (kept through 'confirmed' until registration).
   // Fallback for older confirmed rows: created_at + that project's window

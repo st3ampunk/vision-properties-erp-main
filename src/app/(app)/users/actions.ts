@@ -244,41 +244,59 @@ export async function createUser(
   };
 }
 
-// Change Team / Level (Admin panel · Partners) — reassign a user's role and/or
-// the manager they report to. Validates placement the same way createUser does.
-// Note: the human-readable partner_code (set by a trigger on insert) is left
-// unchanged on a level change.
-export async function updateUserPlacement(formData: FormData): Promise<void> {
+// Change Team / Level (Admin panel · Partners). The database trigger assigns a
+// code for the new sales level in the same transaction as the role change.
+export interface PlacementState {
+  error?: string;
+  updated?: { code: string | null; role: Role };
+}
+
+export async function updateUserPlacement(
+  _prev: PlacementState | undefined,
+  formData: FormData,
+): Promise<PlacementState> {
   const actor = await requireCapability("manage_users");
   const sb = getSupabase();
 
   const id = String(formData.get("id") || "");
   const role = String(formData.get("role") || "") as Role;
   const manager_id = String(formData.get("manager_id") || "") || null;
-  if (!id || !ROLES.includes(role) || role === "admin") return;
-  if (manager_id === id) return; // can't report to oneself
+  if (!id || !ROLES.includes(role) || role === "admin") return { error: "Pick a valid level." };
+  if (manager_id === id) return { error: "A person cannot report to themselves." };
 
   const need = managerRoleOf(role);
   let finalManagerId = manager_id;
   if (need === "admin") {
     if (manager_id) {
       const { data: parent } = await sb.from("users").select("role").eq("id", manager_id).maybeSingle();
-      if (!parent || (parent.role as Role) !== "admin") return;
+      if (!parent || (parent.role as Role) !== "admin") return { error: "A Senior Director must report to the company." };
     } else {
       finalManagerId = await companyId(sb);
     }
   } else if (need) {
     if (manager_id) {
       const { data: parent } = await sb.from("users").select("role").eq("id", manager_id).maybeSingle();
-      if (!parent || !canManageRole(parent.role as Role, role)) return;
+      if (!parent || !canManageRole(parent.role as Role, role)) {
+        return { error: "That manager cannot hold this level beneath them." };
+      }
     } else {
       finalManagerId = await defaultParent(sb, actor);
     }
   }
 
-  await sb.from("users").update({ role, manager_id: finalManagerId }).eq("id", id);
-  await logAudit(actor, "user", id, "placement_change", role);
+  const { data, error } = await sb
+    .from("users")
+    .update({ role, manager_id: finalManagerId })
+    .eq("id", id)
+    .neq("role", "admin")
+    .select("role, partner_code")
+    .maybeSingle();
+  if (error || !data) return { error: error?.message ?? "Account not found. Nothing was changed." };
+
+  await logAudit(actor, "user", id, "placement_change", `${role} · ${data.partner_code ?? "no sales ID"}`);
   revalidatePath("/users");
+  revalidatePath("/business-operators");
+  return { updated: { role: data.role as Role, code: data.partner_code ?? null } };
 }
 
 // Move a branch desk (Pre-Sales / Post-Sales) to a different district — the one
@@ -315,10 +333,10 @@ export async function toggleUserActive(formData: FormData): Promise<void> {
 // ============================================================================
 // RESET A LOGIN'S PASSWORD  (Administration › Block / Change Team & Level)
 //
-// The company Admin is the only account that can do this — `reset_password` is
-// the single capability withheld from a General Manager (see lib/roles.ts),
-// because handing out a new password is effectively handing over that person's
-// identity.
+// Admin or a General Manager (`reset_password`, see lib/roles.ts) — for any
+// non-Admin account in any branch, not only the GM's own district. Handing out a
+// new password is effectively handing over that person's identity, hence the
+// controls below ("Admin" in them means whoever is doing the reset).
 //
 // Five things make this safe rather than just convenient:
 //
